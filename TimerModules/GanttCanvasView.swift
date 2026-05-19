@@ -23,6 +23,11 @@ struct GanttCanvasView: View {
             VStack(spacing: 12) {
                 if timers.isEmpty {
                     emptyCanvasHint
+                        .dropDestination(for: BrickType.self) { items, _ in
+                            handleDrop(items)
+                        } isTargeted: { targeted in
+                            isDropTargeted = targeted
+                        }
                 } else {
                     ForEach(timers) { timer in
                         timerRow(for: timer)
@@ -30,15 +35,15 @@ struct GanttCanvasView: View {
                 }
 
                 addRowDropZone
+                    .dropDestination(for: BrickType.self) { items, _ in
+                        handleDrop(items)
+                    } isTargeted: { targeted in
+                        isDropTargeted = targeted
+                    }
             }
             .padding(20)
         }
         .background(canvasBackground)
-        .dropDestination(for: BrickType.self) { items, _ in
-            return handleDrop(items)
-        } isTargeted: { targeted in
-            isDropTargeted = targeted
-        }
     }
 
     // MARK: Background

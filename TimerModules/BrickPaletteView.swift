@@ -65,8 +65,8 @@ struct BrickPaletteView: View {
 
     private func paletteTile(_ type: BrickType) -> some View {
         VStack(spacing: 4) {
-            Image(systemName: type.symbolName)
-                .font(.system(size: 22))
+            tileGlyph(type)
+                .frame(height: 26)
                 .foregroundStyle(type.isWiredUp ? Color.accentColor : Color.secondary)
             Text(type.displayName)
                 .font(.caption)
@@ -91,12 +91,28 @@ struct BrickPaletteView: View {
         .draggable(type) {
             // Drag preview
             VStack(spacing: 4) {
-                Image(systemName: type.symbolName)
-                    .font(.system(size: 22))
+                tileGlyph(type)
+                    .frame(height: 26)
                 Text(type.displayName).font(.caption)
             }
             .padding(8)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    /// Renders either an SF Symbol (most bricks) or a mathematical-
+    /// operator text glyph (logic gates) depending on the BrickType.
+    @ViewBuilder
+    private func tileGlyph(_ type: BrickType) -> some View {
+        if let symbolName = type.symbolName {
+            Image(systemName: symbolName)
+                .font(.system(size: 22))
+        } else if let glyph = type.textGlyph {
+            Text(glyph)
+                .font(.system(size: 24, weight: .semibold, design: .serif))
+        } else {
+            Image(systemName: "questionmark.square.dashed")
+                .font(.system(size: 22))
         }
     }
 }

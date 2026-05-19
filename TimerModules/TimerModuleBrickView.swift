@@ -102,17 +102,25 @@ struct TimerModuleBrickView: View {
     // MARK: Notation field (the prominent user-label on the brick face)
 
     private var notationField: some View {
-        TextField("Name this timer", text: $data.notation)
-            .font(.system(size: 22, weight: .semibold))
-            .multilineTextAlignment(.center)
-            .textFieldStyle(.plain)
-            .padding(.vertical, 4)
-            .overlay(
-                Rectangle()
-                    .frame(height: 1)
-                    .foregroundStyle(.tertiary),
-                alignment: .bottom
-            )
+        HStack(spacing: 8) {
+            Image(systemName: "pencil.line")
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary)
+            TextField("Name this timer", text: $data.notation)
+                .font(.system(size: 22, weight: .semibold))
+                .textFieldStyle(.plain)
+                .submitLabel(.done)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(.thinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.accentColor.opacity(0.25), lineWidth: 1)
+        )
     }
 
     // MARK: Mode + duration
@@ -126,25 +134,30 @@ struct TimerModuleBrickView: View {
             .pickerStyle(.segmented)
             .disabled(isRunning)
 
-            if data.mode == .countdown {
-                HStack {
-                    Text("Duration")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Stepper(
-                        value: Binding(
-                            get: { Int(data.durationSeconds / 60) },
-                            set: { data.durationSeconds = TimeInterval($0) * 60 }
-                        ),
-                        in: 1...240
-                    ) {
-                        Text("\(Int(data.durationSeconds / 60)) min")
-                            .monospacedDigit()
-                    }
+            // "Trigger at" stepper — sets the elapsed/remaining seconds
+            // when the timer fires its completion signal to downstream
+            // bricks (logic gates, traces, supplemental). Same value
+            // means different things per mode:
+            //   • countdown: total time to count down FROM (fires at 0)
+            //   • count-up:  total time to count up TO   (fires at value;
+            //                timer keeps running as a free stopwatch)
+            HStack(spacing: 12) {
+                Text("Trigger at")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Stepper(
+                    value: Binding(
+                        get: { Int(data.durationSeconds / 60) },
+                        set: { data.durationSeconds = TimeInterval($0) * 60 }
+                    ),
+                    in: 1...240
+                ) {
+                    Text("\(Int(data.durationSeconds / 60)) min")
+                        .monospacedDigit()
                 }
-                .font(.subheadline)
-                .disabled(isRunning)
             }
+            .font(.subheadline)
+            .disabled(isRunning)
         }
     }
 
@@ -182,6 +195,11 @@ struct TimerModuleBrickView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
+
+                Text("Trigger at \(Int(data.durationSeconds / 60)) min")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
             }
         }
         .frame(width: 220, height: 220)

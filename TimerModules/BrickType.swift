@@ -113,13 +113,15 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         }
     }
 
-    /// SF Symbol for the palette tile.
-    var symbolName: String {
+    /// SF Symbol for the palette tile. Returns nil for brick types
+    /// that use a mathematical-operator text glyph instead (logic
+    /// gates) — see `textGlyph`.
+    var symbolName: String? {
         switch self {
         case .timerModule:  return "timer"
         case .andGate, .orGate, .notGate, .norGate,
              .nandGate, .xorGate, .xnorGate:
-            return "logo.playstation"  // placeholder; M3 replaces with custom
+            return nil  // uses textGlyph
         case .fsEdge, .ssEdge, .ffEdge, .sfEdge:
             return "arrow.right"
         case .lagLead:      return "arrow.left.arrow.right"
@@ -133,6 +135,21 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         case .webhook:      return "network"
         case .conditional:  return "questionmark.diamond"
         case .loop:         return "arrow.clockwise"
+        }
+    }
+
+    /// Boolean-operator text glyph for the logic-gate bricks.
+    /// Returns nil for non-gate bricks (which use `symbolName`).
+    var textGlyph: String? {
+        switch self {
+        case .andGate:   return "∧"   // logical AND
+        case .orGate:    return "∨"   // logical OR
+        case .notGate:   return "¬"   // logical NOT
+        case .norGate:   return "↓"   // Peirce arrow (NOR)
+        case .nandGate:  return "⊼"   // Sheffer stroke (NAND)
+        case .xorGate:   return "⊕"   // exclusive OR
+        case .xnorGate:  return "⊙"   // XNOR
+        default:         return nil
         }
     }
 
