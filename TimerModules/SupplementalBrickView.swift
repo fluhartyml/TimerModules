@@ -262,7 +262,9 @@ struct SupplementalBrickView: View {
             TextField("https://…", text: $data.configString)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 14, design: .monospaced))
+                #if os(iOS)
                 .textInputAutocapitalization(.never)
+                #endif
                 .autocorrectionDisabled()
 
             if data.kindRaw != "GET" {

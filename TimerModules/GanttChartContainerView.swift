@@ -31,7 +31,9 @@ struct GanttChartContainerView: View {
             GanttCanvasView(chartId: chart.id, columnCount: chart.columnCount)
         }
         .navigationTitle(chart.name)
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Button {

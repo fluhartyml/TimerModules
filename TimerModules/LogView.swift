@@ -34,7 +34,9 @@ struct LogView: View {
                 }
             }
             .navigationTitle("\(chartName) — Log")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Done") { dismiss() }
@@ -71,7 +73,9 @@ struct LogView: View {
                 }
             }
         }
+        #if os(iOS)
         .listStyle(.insetGrouped)
+        #endif
     }
 
     /// Groups entries by runId, returning (runId, [entries]) tuples

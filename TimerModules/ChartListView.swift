@@ -111,7 +111,9 @@ struct ChartListView: View {
                 }
             }
         }
+        #if os(iOS)
         .listStyle(.insetGrouped)
+        #endif
         .navigationDestination(for: UUID.self) { chartId in
             if let chart = charts.first(where: { $0.id == chartId }) {
                 GanttChartContainerView(chart: chart)
