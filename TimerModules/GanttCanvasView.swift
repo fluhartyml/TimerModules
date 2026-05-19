@@ -2,13 +2,15 @@
 //
 // The Gantt canvas — vertical list of rows where bricks live.
 // Drop a brick from BrickPaletteView onto the canvas or its
-// add-row drop zone to create a new instance. Timer modules and
-// logic gates interleave on the canvas by their `order` field.
+// add-row drop zone to create a new instance. Timer, gate, and
+// trace bricks interleave on the canvas by their `order` field.
 //
-// M2 wires .timerModule end-to-end.
-// M3 wires the seven boolean logic gates end-to-end (.andGate,
-// .orGate, .notGate, .norGate, .nandGate, .xorGate, .xnorGate).
-// M4 wires PM-dependency traces; M5 wires supplemental bricks.
+// M2 wires .timerModule.
+// M3 wires the seven boolean logic gates.
+// M4 wires the six PM-dependency traces (FS/SS/FF/SF/Lag-Lead/
+//   Splitter) AND draws edge arrows between source/destination
+//   brick positions via an overlay layer.
+// M5 wires supplemental bricks.
 
 import SwiftUI
 import SwiftData
@@ -16,20 +18,24 @@ import SwiftData
 struct GanttCanvasView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \TimerModuleData.order) private var timers: [TimerModuleData]
-    @Query(sort: \GateBrickData.order) private var gates: [GateBrickData]
+    @Query(sort: \GateBrickData.order)   private var gates:  [GateBrickData]
+    @Query(sort: \TraceData.order)       private var traces: [TraceData]
 
     @State private var isDropTargeted: Bool = false
+    @State private var brickFrames: [UUID: CGRect] = [:]
 
-    /// Polymorphic wrapper so timers and gates can interleave in a
+    /// Polymorphic wrapper so all brick types can interleave in a
     /// single ordered render loop.
     private enum CanvasBrick: Identifiable {
         case timer(TimerModuleData)
         case gate(GateBrickData)
+        case trace(TraceData)
 
         var id: UUID {
             switch self {
             case .timer(let t): return t.id
             case .gate(let g):  return g.id
+            case .trace(let r): return r.id
             }
         }
 
@@ -37,15 +43,16 @@ struct GanttCanvasView: View {
             switch self {
             case .timer(let t): return t.order
             case .gate(let g):  return g.order
+            case .trace(let r): return r.order
             }
         }
     }
 
-    /// Combined timer + gate bricks, sorted by `order` for rendering.
     private var canvasBricks: [CanvasBrick] {
         let t = timers.map { CanvasBrick.timer($0) }
         let g = gates.map  { CanvasBrick.gate($0) }
-        return (t + g).sorted { $0.order < $1.order }
+        let r = traces.map { CanvasBrick.trace($0) }
+        return (t + g + r).sorted { $0.order < $1.order }
     }
 
     var body: some View {
@@ -73,6 +80,14 @@ struct GanttCanvasView: View {
             }
             .padding(20)
         }
+        .coordinateSpace(name: "ganttCanvas")
+        .overlay(alignment: .topLeading) {
+            traceEdgeOverlay
+                .allowsHitTesting(false)
+        }
+        .onPreferenceChange(BrickFramePreferenceKey.self) { newValue in
+            brickFrames = newValue
+        }
         .background(canvasBackground)
     }
 
@@ -92,7 +107,7 @@ struct GanttCanvasView: View {
             Text("Drag a brick here to start your Gantt")
                 .font(.title3)
                 .foregroundStyle(.secondary)
-            Text("Try the Timer tile or any logic gate from the palette above.")
+            Text("Try a Timer, a logic gate, or a PM trace from the palette above.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -107,19 +122,31 @@ struct GanttCanvasView: View {
         )
     }
 
-    // MARK: Canvas row (polymorphic)
+    // MARK: Polymorphic canvas row
 
     @ViewBuilder
     private func canvasRow(for brick: CanvasBrick) -> some View {
         HStack(alignment: .top, spacing: 12) {
             rowHandle(for: brick)
-            switch brick {
-            case .timer(let timer):
-                TimerModuleBrickView(data: timer)
-            case .gate(let gate):
-                GateBrickView(data: gate)
-            }
+            brickContent(for: brick)
+                .reportBrickFrame(id: brick.id)
             Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    private func brickContent(for brick: CanvasBrick) -> some View {
+        switch brick {
+        case .timer(let timer):
+            TimerModuleBrickView(data: timer)
+        case .gate(let gate):
+            GateBrickView(data: gate)
+        case .trace(let trace):
+            TraceBrickView(
+                data: trace,
+                timerCandidates: timers,
+                gateCandidates: gates
+            )
         }
     }
 
@@ -151,6 +178,7 @@ struct GanttCanvasView: View {
         switch brick {
         case .timer(let t): modelContext.delete(t)
         case .gate(let g):  modelContext.delete(g)
+        case .trace(let r): modelContext.delete(r)
         }
     }
 
@@ -175,14 +203,82 @@ struct GanttCanvasView: View {
         .frame(height: 64)
     }
 
+    // MARK: Trace edge overlay
+
+    @ViewBuilder
+    private var traceEdgeOverlay: some View {
+        Canvas { ctx, size in
+            for trace in traces where trace.isWired {
+                guard let srcId = trace.sourceBrickId,
+                      let srcFrame = brickFrames[srcId] else { continue }
+
+                let srcPoint = anchorPoint(of: srcFrame, side: trace.sourceAnchor)
+
+                for destId in trace.destinationBrickIds {
+                    guard let destFrame = brickFrames[destId] else { continue }
+                    let destPoint = anchorPoint(of: destFrame, side: trace.destinationAnchor)
+
+                    drawArrow(in: ctx, from: srcPoint, to: destPoint, color: edgeColor(for: trace))
+                }
+            }
+        }
+    }
+
+    private func anchorPoint(of frame: CGRect, side: TraceAnchor) -> CGPoint {
+        switch side {
+        case .start:  return CGPoint(x: frame.minX, y: frame.midY)
+        case .finish: return CGPoint(x: frame.maxX, y: frame.midY)
+        }
+    }
+
+    private func edgeColor(for trace: TraceData) -> Color {
+        switch trace.traceType {
+        case .fsEdge, .ssEdge, .ffEdge, .sfEdge: return .blue
+        case .lagLead:                            return .purple
+        case .splitter:                           return .teal
+        default:                                  return .gray
+        }
+    }
+
+    /// Draws a Bezier curve with an arrowhead from `start` to `end`.
+    private func drawArrow(in ctx: GraphicsContext, from start: CGPoint, to end: CGPoint, color: Color) {
+        let dx = end.x - start.x
+        let controlOffset = max(40, abs(dx) * 0.4)
+        let c1 = CGPoint(x: start.x + controlOffset, y: start.y)
+        let c2 = CGPoint(x: end.x   - controlOffset, y: end.y)
+
+        var path = Path()
+        path.move(to: start)
+        path.addCurve(to: end, control1: c1, control2: c2)
+        ctx.stroke(path, with: .color(color.opacity(0.85)), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+
+        // Arrowhead at end
+        let theta: CGFloat = .pi / 7
+        let headLength: CGFloat = 10
+        let angle = atan2(end.y - c2.y, end.x - c2.x)
+
+        let h1 = CGPoint(
+            x: end.x - headLength * cos(angle - theta),
+            y: end.y - headLength * sin(angle - theta)
+        )
+        let h2 = CGPoint(
+            x: end.x - headLength * cos(angle + theta),
+            y: end.y - headLength * sin(angle + theta)
+        )
+
+        var head = Path()
+        head.move(to: end)
+        head.addLine(to: h1)
+        head.move(to: end)
+        head.addLine(to: h2)
+        ctx.stroke(head, with: .color(color.opacity(0.85)), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+    }
+
     // MARK: Drop handling
 
     private func handleDrop(_ items: [BrickType]) -> Bool {
         guard let type = items.first else { return false }
-        guard type.isWiredUp else {
-            // Type isn't wired yet (M4+ work); silently no-op.
-            return false
-        }
+        guard type.isWiredUp else { return false }
 
         let nextOrder = nextAvailableOrder()
 
@@ -205,17 +301,25 @@ struct GanttCanvasView: View {
             modelContext.insert(new)
             return true
 
+        case .fsEdge, .ssEdge, .ffEdge, .sfEdge, .lagLead, .splitter:
+            let new = TraceData(
+                traceType: type,
+                order: nextOrder,
+                notation: ""
+            )
+            modelContext.insert(new)
+            return true
+
         default:
-            // PM dependencies (M4) and supplemental bricks (M5)
-            // route here when their isWiredUp flips.
+            // Supplemental bricks land here (M5).
             return false
         }
     }
 
-    /// Next free `order` across both timer and gate bricks.
     private func nextAvailableOrder() -> Int {
         let highestTimer = timers.map(\.order).max() ?? -1
         let highestGate  = gates.map(\.order).max() ?? -1
-        return max(highestTimer, highestGate) + 1
+        let highestTrace = traces.map(\.order).max() ?? -1
+        return max(highestTimer, highestGate, highestTrace) + 1
     }
 }

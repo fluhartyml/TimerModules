@@ -155,12 +155,14 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
 
     /// Whether this brick type is fully wired up in v1.0 of the build.
     /// M2 wires .timerModule; M3 flips the seven boolean logic gates;
-    /// later milestones flip PM dependencies (M4) and supplemental (M5).
+    /// M4 flips the six PM-dependency types; M5 flips supplemental.
     var isWiredUp: Bool {
         switch self {
         case .timerModule,
              .andGate, .orGate, .notGate, .norGate,
-             .nandGate, .xorGate, .xnorGate:
+             .nandGate, .xorGate, .xnorGate,
+             .fsEdge, .ssEdge, .ffEdge, .sfEdge,
+             .lagLead, .splitter:
             return true
         default:
             return false
