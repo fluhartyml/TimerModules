@@ -13,6 +13,13 @@
 
 import Foundation
 import SwiftData
+import UserNotifications
+import AVFoundation
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 enum SignalRouter {
     /// In-memory map of chart id → ProgramRunner. Each chart that
@@ -445,6 +452,7 @@ enum SignalRouter {
                 runId: runId,
                 in: context
             )
+            executeAction(sup)
         case .webhook:
             // Outbound HTTP. Fire-and-forget; the log captures
             // the attempt regardless of network success.
@@ -531,6 +539,68 @@ enum SignalRouter {
 
     private static func escape(_ s: String) -> String {
         s.replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    // MARK: Action firing
+    //
+    // Per Michael 2026-05-19 — when a Timer completes and a trace
+    // routes to an Action card, we actually execute the side
+    // effect the user configured. The user's message lives in
+    // sup.configString; the kind is sup.kindRaw.
+
+    private static func executeAction(_ sup: SupplementalBrickData) {
+        switch sup.kindRaw {
+        case "sound":
+            playActionSound(named: sup.configString)
+
+        case "notification":
+            postLocalNotification(
+                title: sup.notation.isEmpty ? "TimerModules" : sup.notation,
+                body: sup.configString
+            )
+
+        case "log":
+            // Already captured via the LogEntry written by the
+            // caller; nothing further to do here.
+            return
+
+        case "link":
+            openLink(sup.configString)
+
+        default:
+            return
+        }
+    }
+
+    private static func playActionSound(named name: String) {
+        let sound = ActionSound(rawValue: name) ?? .default
+        AudioServicesPlaySystemSound(sound.soundID)
+    }
+
+    private static func postLocalNotification(title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body.isEmpty ? "Timer reached this step." : body
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil  // deliver immediately
+        )
+        UNUserNotificationCenter.current().add(request) { _ in
+            // Authorization may not be granted; we silently drop.
+            // App-launch flow requests authorization (see TimerModulesApp).
+        }
+    }
+
+    private static func openLink(_ urlString: String) {
+        guard let url = URL(string: urlString), !urlString.isEmpty else { return }
+        #if canImport(UIKit)
+        UIApplication.shared.open(url)
+        #elseif canImport(AppKit)
+        NSWorkspace.shared.open(url)
+        #endif
     }
 
     // MARK: Webhook firing

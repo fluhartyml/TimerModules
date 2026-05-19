@@ -180,15 +180,33 @@ struct SupplementalBrickView: View {
             }
             .pickerStyle(.menu)
 
-            TextField(actionConfigPlaceholder, text: $data.configString)
-                .textFieldStyle(.roundedBorder)
-                .font(.subheadline)
+            if data.kindRaw == "sound" {
+                soundPicker
+            } else {
+                TextField(actionConfigPlaceholder, text: $data.configString)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.subheadline)
+            }
         }
+    }
+
+    /// Picker of curated predefined iOS sounds (Michael 2026-05-19).
+    /// Selected sound name is stored in configString so the
+    /// SignalRouter can look it up at fire time.
+    private var soundPicker: some View {
+        Picker("Sound", selection: Binding(
+            get: { ActionSound(rawValue: data.configString) ?? .default },
+            set: { data.configString = $0.rawValue }
+        )) {
+            ForEach(ActionSound.allCases) { sound in
+                Text(sound.rawValue).tag(sound)
+            }
+        }
+        .pickerStyle(.menu)
     }
 
     private var actionConfigPlaceholder: String {
         switch data.kindRaw {
-        case "sound":         return "System sound name"
         case "notification":  return "Notification message"
         case "log":           return "Log message"
         case "link":          return "URL to open"

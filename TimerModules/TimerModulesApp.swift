@@ -7,9 +7,19 @@
 
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 @main
 struct TimerModulesApp: App {
+    init() {
+        // Request permission to post local notifications (used by
+        // Action cards configured with kind = notification).
+        // Fire-and-forget; user can also grant later via Settings.
+        UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .sound, .badge]
+        ) { _, _ in }
+    }
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
