@@ -79,10 +79,19 @@ struct GanttChartContainerView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 columnStepper
                 if let runner = runner {
-                    StopButtonView(runner: runner) {
-                        runner.stopByUser(in: modelContext)
-                        showingLog = true
-                    }
+                    ProgramToggleButton(
+                        runner: runner,
+                        onStart: {
+                            SignalRouter.startProgram(chartId: chart.id, in: modelContext)
+                        },
+                        onStop: {
+                            runner.stopByUser(in: modelContext)
+                            showingLog = true
+                        },
+                        onReset: {
+                            runner.reset()
+                        }
+                    )
                 }
                 Button {
                     showingLog = true

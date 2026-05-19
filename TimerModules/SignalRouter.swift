@@ -62,6 +62,47 @@ enum SignalRouter {
         propagate(from: trigger.id, in: chartId, runId: runId, in: context)
     }
 
+    /// Called when the toolbar Start button is pressed. Starts the
+    /// chart's heartbeat runner, then fires every brick on row 0
+    /// as the program's entry-point set (Michael 2026-05-19 — row
+    /// 0 is the natural entry point; Trigger bricks are explicit
+    /// named entry points but not the only way to start a program).
+    static func startProgram(chartId: UUID, in context: ModelContext) {
+        guard let runner = runners[chartId] else { return }
+        let runId = runner.start(in: context)
+
+        let row0Timers = (try? context.fetch(
+            FetchDescriptor<TimerModuleData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.order == 0 }
+            )
+        )) ?? []
+        let row0Sups = (try? context.fetch(
+            FetchDescriptor<SupplementalBrickData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.order == 0 }
+            )
+        )) ?? []
+
+        for timer in row0Timers {
+            timer.runningSince = Date()
+            timer.updatedDate = Date()
+            log(
+                eventType: "timerStarted",
+                brickId: timer.id,
+                brickTypeRaw: BrickType.timerModule.rawValue,
+                brickNotation: timer.notation,
+                ganttChartId: chartId,
+                runId: runId,
+                in: context
+            )
+            propagate(from: timer.id, in: chartId, runId: runId, in: context)
+        }
+
+        for sup in row0Sups {
+            handleSupplementalSignal(sup, runId: runId, in: context)
+            propagate(from: sup.id, in: chartId, runId: runId, in: context)
+        }
+    }
+
     /// Called when a Timer brick completes (countdown reached 0
     /// or user pressed Complete on count-up).
     static func fireTimerCompletion(
