@@ -233,15 +233,56 @@ struct GanttCanvasView: View {
         }
     }
 
-    /// Right-click / long-press context menu item for deleting a
-    /// card. Replaces the row-level trash icon that the 2D-grid
-    /// refactor dropped (Michael caught this 2026-05-19).
+    /// Right-click / long-press context menu items for a card.
+    /// Includes Move Up/Down/Left/Right + Delete (Michael caught
+    /// both the missing delete and missing move 2026-05-19).
     @ViewBuilder
     private func deleteMenuItem(for brick: CanvasBrick) -> some View {
+        Button {
+            move(brick, by: (-1, 0))  // row up
+        } label: {
+            Label("Move up a row", systemImage: "arrow.up")
+        }
+        Button {
+            move(brick, by: (1, 0))   // row down
+        } label: {
+            Label("Move down a row", systemImage: "arrow.down")
+        }
+        Button {
+            move(brick, by: (0, -1))  // column left
+        } label: {
+            Label("Move left a column", systemImage: "arrow.left")
+        }
+        Button {
+            move(brick, by: (0, 1))   // column right
+        } label: {
+            Label("Move right a column", systemImage: "arrow.right")
+        }
+        Divider()
         Button(role: .destructive) {
             deleteCanvasBrick(brick)
         } label: {
             Label("Delete card", systemImage: "trash")
+        }
+    }
+
+    /// Polymorphic move — adjusts a card's `order` (row) and
+    /// `column` by the given delta. Bottom-clamped to 0 so cards
+    /// can't move to negative positions.
+    private func move(_ brick: CanvasBrick, by delta: (row: Int, column: Int)) {
+        switch brick {
+        case .timer(let t):
+            t.order = max(0, t.order + delta.row)
+            t.column = max(0, t.column + delta.column)
+            t.updatedDate = Date()
+        case .gate(let g):
+            g.order = max(0, g.order + delta.row)
+            g.column = max(0, g.column + delta.column)
+            g.updatedDate = Date()
+        case .supplemental(let s):
+            s.order = max(0, s.order + delta.row)
+            s.column = max(0, s.column + delta.column)
+            s.updatedDate = Date()
         }
     }
 
