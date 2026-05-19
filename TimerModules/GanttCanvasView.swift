@@ -118,34 +118,58 @@ struct GanttCanvasView: View {
     }
 
     var body: some View {
-        ScrollView([.vertical, .horizontal]) {
-            VStack(alignment: .leading, spacing: 14) {
-                if bricksByRow.isEmpty {
-                    emptyCanvasHint
-                        .dropDestination(for: BrickType.self) { items, _ in
-                            handleDrop(items, targetRow: 0, targetColumn: 0)
-                        } isTargeted: { targeted in
-                            dropTargetedNewRow = targeted
+        ScrollViewReader { proxy in
+            ScrollView([.vertical, .horizontal]) {
+                VStack(alignment: .leading, spacing: 14) {
+                    if bricksByRow.isEmpty {
+                        emptyCanvasHint
+                            .dropDestination(for: BrickType.self) { items, _ in
+                                handleDrop(items, targetRow: 0, targetColumn: 0)
+                            } isTargeted: { targeted in
+                                dropTargetedNewRow = targeted
+                            }
+                    } else {
+                        ForEach(bricksByRow, id: \.row) { row in
+                            rowContainer(rowIndex: row.row, bricks: row.bricks)
+                                .id(row.row)  // ScrollViewReader anchor
                         }
-                } else {
-                    ForEach(bricksByRow, id: \.row) { row in
-                        rowContainer(rowIndex: row.row, bricks: row.bricks)
+                    }
+
+                    addNewRowDropZone
+                }
+                .padding(20)
+            }
+            .coordinateSpace(name: "ganttCanvas")
+            .overlay(alignment: .topLeading) {
+                traceEdgeOverlay
+                    .allowsHitTesting(false)
+            }
+            .onPreferenceChange(BrickFramePreferenceKey.self) { newValue in
+                brickFrames = newValue
+            }
+            .background(canvasBackground)
+            // Auto-scroll to the active row when the program runs
+            // through its row-barrier sequence (Michael 2026-05-19,
+            // iPhone testing — "the drop area is so big and
+            // scrollable but the iphone screen is realitively too
+            // small").
+            .onChange(of: activeRunningRow) { _, newRow in
+                if let newRow = newRow {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        proxy.scrollTo(newRow, anchor: .center)
                     }
                 }
-
-                addNewRowDropZone
             }
-            .padding(20)
         }
-        .coordinateSpace(name: "ganttCanvas")
-        .overlay(alignment: .topLeading) {
-            traceEdgeOverlay
-                .allowsHitTesting(false)
-        }
-        .onPreferenceChange(BrickFramePreferenceKey.self) { newValue in
-            brickFrames = newValue
-        }
-        .background(canvasBackground)
+    }
+
+    /// The lowest-numbered row that currently has a running timer.
+    /// nil when no timers are running. Drives auto-scroll focus.
+    private var activeRunningRow: Int? {
+        timers
+            .filter { $0.runningSince != nil }
+            .map(\.order)
+            .min()
     }
 
     // MARK: Background
@@ -184,7 +208,8 @@ struct GanttCanvasView: View {
     // MARK: Row container
 
     private func rowContainer(rowIndex: Int, bricks: [CanvasBrick]) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        let isActive = (activeRunningRow == rowIndex)
+        return HStack(alignment: .top, spacing: 10) {
             rowHandle(rowIndex)
 
             ForEach(bricks) { brick in
@@ -196,6 +221,19 @@ struct GanttCanvasView: View {
 
             Spacer(minLength: 0)
         }
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(isActive ? Color.accentColor.opacity(0.08) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(
+                    isActive ? Color.accentColor.opacity(0.5) : Color.clear,
+                    lineWidth: 2
+                )
+        )
+        .animation(.easeInOut(duration: 0.25), value: isActive)
     }
 
     private func rowHandle(_ rowIndex: Int) -> some View {
