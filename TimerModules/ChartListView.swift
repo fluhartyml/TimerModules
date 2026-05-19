@@ -32,6 +32,9 @@ struct ChartListView: View {
 
     @State private var chartToDelete: GanttChartData?
     @State private var showingDeleteConfirm = false
+    @State private var chartToRename: GanttChartData?
+    @State private var renameDraft: String = ""
+    @State private var showingRename = false
 
     var body: some View {
         Group {
@@ -67,6 +70,17 @@ struct ChartListView: View {
             }
         } message: { _ in
             Text("All bricks and log entries in this Timer Module will be deleted. This can't be undone.")
+        }
+        .alert("Rename Timer Module", isPresented: $showingRename, presenting: chartToRename) { chart in
+            TextField("Name", text: $renameDraft)
+            Button("Save") {
+                let trimmed = renameDraft.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty {
+                    chart.name = trimmed
+                    chart.updatedDate = Date()
+                }
+            }
+            Button("Cancel", role: .cancel) { }
         }
     }
 
@@ -113,6 +127,14 @@ struct ChartListView: View {
                     }
                 }
                 .contextMenu {
+                    Button {
+                        chartToRename = chart
+                        renameDraft = chart.name
+                        showingRename = true
+                    } label: {
+                        Label("Rename Timer Module", systemImage: "pencil")
+                    }
+                    Divider()
                     Button(role: .destructive) {
                         chartToDelete = chart
                         showingDeleteConfirm = true

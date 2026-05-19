@@ -64,11 +64,14 @@ struct GanttChartContainerView: View {
         .sheet(isPresented: $showingLog) {
             LogView(chartId: chart.id, chartName: chart.name)
         }
-        .alert("Rename chart", isPresented: $showingRename) {
-            TextField("Chart name", text: $renameDraft)
+        .alert("Rename Timer Module", isPresented: $showingRename) {
+            TextField("Name", text: $renameDraft)
             Button("Save") {
-                chart.name = renameDraft.trimmingCharacters(in: .whitespaces)
-                chart.updatedDate = Date()
+                let trimmed = renameDraft.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty {
+                    chart.name = trimmed
+                    chart.updatedDate = Date()
+                }
             }
             Button("Cancel", role: .cancel) { }
         }
