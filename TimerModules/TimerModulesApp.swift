@@ -13,10 +13,12 @@ struct TimerModulesApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
+            GanttChartData.self,
             TimerModuleData.self,
             GateBrickData.self,
             TraceData.self,
             SupplementalBrickData.self,
+            LogEntry.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

@@ -24,9 +24,14 @@ final class GateBrickData {
     /// it without needing a custom transformer.
     var gateTypeRaw: String
 
-    /// Row position on the Gantt canvas. Lower = higher row.
-    /// Shared sort key with TimerModuleData so bricks can interleave.
+    /// Row on the Gantt canvas (vertical position; lower = higher up).
     var order: Int
+
+    /// Column on the Gantt canvas (horizontal position within the row).
+    var column: Int
+
+    /// Which saved Gantt chart this brick belongs to.
+    var ganttChartId: UUID?
 
     /// Optional user notation — gate brick can be labeled like timers.
     var notation: String
@@ -39,6 +44,8 @@ final class GateBrickData {
         id: UUID = UUID(),
         gateType: BrickType,
         order: Int = 0,
+        column: Int = 0,
+        ganttChartId: UUID? = nil,
         notation: String = "",
         createdDate: Date = Date(),
         updatedDate: Date = Date()
@@ -46,6 +53,8 @@ final class GateBrickData {
         self.id = id
         self.gateTypeRaw = gateType.rawValue
         self.order = order
+        self.column = column
+        self.ganttChartId = ganttChartId
         self.notation = notation
         self.createdDate = createdDate
         self.updatedDate = updatedDate

@@ -39,8 +39,14 @@ final class TraceData {
     /// Negative = downstream event happens N seconds BEFORE (lead).
     var lagSeconds: TimeInterval
 
-    /// Row position on the Gantt canvas — interleaved with timers + gates.
+    /// Row on the Gantt canvas (vertical position; lower = higher up).
     var order: Int
+
+    /// Column on the Gantt canvas (horizontal position within the row).
+    var column: Int
+
+    /// Which saved Gantt chart this trace belongs to.
+    var ganttChartId: UUID?
 
     /// Optional user notation.
     var notation: String
@@ -56,6 +62,8 @@ final class TraceData {
         destinationBrickIds: [UUID] = [],
         lagSeconds: TimeInterval = 0,
         order: Int = 0,
+        column: Int = 0,
+        ganttChartId: UUID? = nil,
         notation: String = "",
         createdDate: Date = Date(),
         updatedDate: Date = Date()
@@ -66,6 +74,8 @@ final class TraceData {
         self.destinationBrickIds = destinationBrickIds
         self.lagSeconds = lagSeconds
         self.order = order
+        self.column = column
+        self.ganttChartId = ganttChartId
         self.notation = notation
         self.createdDate = createdDate
         self.updatedDate = updatedDate

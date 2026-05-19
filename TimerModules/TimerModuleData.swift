@@ -42,9 +42,18 @@ final class TimerModuleData {
     /// Used together with accumulatedSeconds for elapsed-time math.
     var runningSince: Date?
 
-    /// Position on the Gantt canvas. Lower = higher row. Updated by the
-    /// canvas at M2.
+    /// Row on the Gantt canvas (vertical position; lower = higher up).
     var order: Int
+
+    /// Column on the Gantt canvas (horizontal position within the row;
+    /// 0 = leftmost). Same-row + different-column = sequential bricks.
+    /// Different-row + same-column = parallel/simultaneous bricks.
+    var column: Int
+
+    /// Which saved Gantt chart this brick belongs to. Nil for legacy
+    /// rows from before M5.5; auto-assigned to the active chart at
+    /// access time by the chart-list bootstrap.
+    var ganttChartId: UUID?
 
     /// Bookkeeping.
     var createdDate: Date
@@ -58,6 +67,8 @@ final class TimerModuleData {
         accumulatedSeconds: TimeInterval = 0,
         runningSince: Date? = nil,
         order: Int = 0,
+        column: Int = 0,
+        ganttChartId: UUID? = nil,
         createdDate: Date = Date(),
         updatedDate: Date = Date()
     ) {
@@ -68,6 +79,8 @@ final class TimerModuleData {
         self.accumulatedSeconds = accumulatedSeconds
         self.runningSince = runningSince
         self.order = order
+        self.column = column
+        self.ganttChartId = ganttChartId
         self.createdDate = createdDate
         self.updatedDate = updatedDate
     }

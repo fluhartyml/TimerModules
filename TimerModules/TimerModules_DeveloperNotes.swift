@@ -121,6 +121,20 @@
 //        Action, Group, Variable, Webhook, Conditional, Loop.
 //        Trigger especially — every runnable canvas needs one.
 //
+//   M5.5 — Multi-Gantt + execution log + signal routing +
+//        count-up Complete. Each Gantt chart is a program; app
+//        supports multiple saved charts. Per-chart execution
+//        log captures every event in the program run. Count-up
+//        timers gain a manual Complete button (no Trigger-at;
+//        elapsed at Complete is the output). Signal-routing
+//        layer propagates Trigger → traces → downstream bricks.
+//        New @Models: GanttChartData, LogEntry. All existing
+//        brick models gain a ganttChartId.
+//
+//   M5.6 — Printable flat Gantt export (PDF). Letter-landscape
+//        compact rendering (bars + arrows, no controls) via
+//        SwiftUI ImageRenderer → PDF context.
+//
 //   M6 — Alarm / notification. Silent / audible / system
 //        notification, user-selectable per timer, foreground +
 //        background.

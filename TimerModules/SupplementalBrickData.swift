@@ -20,9 +20,14 @@ final class SupplementalBrickData {
     /// supplemental cases.
     var brickTypeRaw: String
 
-    /// Row position on the Gantt canvas (interleaves with the
-    /// other brick families).
+    /// Row on the Gantt canvas (vertical position; lower = higher up).
     var order: Int
+
+    /// Column on the Gantt canvas (horizontal position within the row).
+    var column: Int
+
+    /// Which saved Gantt chart this brick belongs to.
+    var ganttChartId: UUID?
 
     /// User-editable label across all supplemental types.
     var notation: String
@@ -79,6 +84,8 @@ final class SupplementalBrickData {
         id: UUID = UUID(),
         brickType: BrickType,
         order: Int = 0,
+        column: Int = 0,
+        ganttChartId: UUID? = nil,
         notation: String = "",
         textContent: String = "",
         kindRaw: String = "",
@@ -97,6 +104,8 @@ final class SupplementalBrickData {
         self.id = id
         self.brickTypeRaw = brickType.rawValue
         self.order = order
+        self.column = column
+        self.ganttChartId = ganttChartId
         self.notation = notation
         self.textContent = textContent
         self.kindRaw = kindRaw
