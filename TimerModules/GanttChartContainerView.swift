@@ -21,15 +21,32 @@ struct GanttChartContainerView: View {
     @State private var showingRename = false
     @State private var renameDraft: String = ""
 
+    /// Shared tap-to-wire state — when the user taps the Trace tile in
+    /// the palette, this drives the canvas's source/destination tap
+    /// flow. M5.7 (Michael 2026-05-19).
+    @State private var wiring = WiringState()
+
     var body: some View {
-        VStack(spacing: 0) {
-            BrickPaletteView()
-                .frame(maxHeight: 200)
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                BrickPaletteView(wiring: wiring)
+                    .frame(maxHeight: 200)
 
-            Divider()
+                Divider()
 
-            GanttCanvasView(chartId: chart.id, columnCount: chart.columnCount)
+                GanttCanvasView(
+                    chartId: chart.id,
+                    columnCount: chart.columnCount,
+                    wiring: wiring
+                )
+            }
+
+            if wiring.isWiring {
+                wiringBanner
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
+        .animation(.easeInOut(duration: 0.18), value: wiring.isWiring)
         .navigationTitle(chart.name)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -78,6 +95,36 @@ struct GanttChartContainerView: View {
         .onAppear {
             chart.lastOpenedDate = Date()
         }
+    }
+
+    /// Floating banner shown while the user is mid-wiring. Tells them
+    /// what to do next and offers a Cancel button to exit wiring mode.
+    private var wiringBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
+                .font(.system(size: 18))
+                .foregroundStyle(.white)
+            Text(wiring.bannerText)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+            Spacer()
+            Button {
+                wiring.cancel()
+            } label: {
+                Text("Cancel")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.accentColor)
+        .clipShape(Capsule())
+        .shadow(radius: 6, y: 3)
+        .padding(.top, 12)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: 520)
     }
 
     private var columnStepper: some View {

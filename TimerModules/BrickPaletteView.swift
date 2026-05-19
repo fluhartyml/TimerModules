@@ -13,6 +13,11 @@
 import SwiftUI
 
 struct BrickPaletteView: View {
+    /// Shared tap-to-wire state. When the user taps the Trace tile,
+    /// we flip into "awaitingSource" mode and the GanttCanvasView
+    /// handles the subsequent brick taps.
+    @Bindable var wiring: WiringState
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             paletteHeader
@@ -63,7 +68,50 @@ struct BrickPaletteView: View {
         }
     }
 
+    @ViewBuilder
     private func paletteTile(_ type: BrickType) -> some View {
+        if type == .trace {
+            traceTile
+        } else {
+            draggableTile(type)
+        }
+    }
+
+    /// The Trace tile uses tap-to-wire instead of drag-and-drop
+    /// (M5.7). Tapping it puts the canvas into wiring mode where
+    /// the user then taps source and destination bricks.
+    private var traceTile: some View {
+        let type = BrickType.trace
+        let isActiveWiringTool = wiring.isWiring
+        return VStack(spacing: 4) {
+            tileGlyph(type)
+                .frame(height: 26)
+                .foregroundStyle(isActiveWiringTool ? Color.white : Color.accentColor)
+            Text(type.displayName)
+                .font(.caption)
+                .foregroundStyle(isActiveWiringTool ? Color.white : Color.primary)
+                .lineLimit(1)
+        }
+        .frame(width: 64, height: 64)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(isActiveWiringTool ? Color.accentColor : Color.clear)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.accentColor.opacity(isActiveWiringTool ? 0 : 0.6), lineWidth: 1.5)
+        )
+        .onTapGesture {
+            if wiring.isWiring {
+                wiring.cancel()
+            } else {
+                wiring.startWiring()
+            }
+        }
+    }
+
+    private func draggableTile(_ type: BrickType) -> some View {
         VStack(spacing: 4) {
             tileGlyph(type)
                 .frame(height: 26)
@@ -89,7 +137,6 @@ struct BrickPaletteView: View {
         )
         .opacity(type.isWiredUp ? 1.0 : 0.45)
         .draggable(type) {
-            // Drag preview
             VStack(spacing: 4) {
                 tileGlyph(type)
                     .frame(height: 26)
@@ -118,6 +165,6 @@ struct BrickPaletteView: View {
 }
 
 #Preview {
-    BrickPaletteView()
+    BrickPaletteView(wiring: WiringState())
         .frame(height: 160)
 }

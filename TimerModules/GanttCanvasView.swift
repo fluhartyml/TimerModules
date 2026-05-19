@@ -27,6 +27,11 @@ struct GanttCanvasView: View {
     let chartId: UUID
     let columnCount: Int
 
+    /// Shared tap-to-wire coordinator with BrickPaletteView (M5.7).
+    /// When wiring.isWiring is true, bricks become tappable for
+    /// source/destination selection instead of operating normally.
+    @Bindable var wiring: WiringState
+
     @Environment(\.modelContext) private var modelContext
 
     @Query private var timers:        [TimerModuleData]
@@ -38,9 +43,10 @@ struct GanttCanvasView: View {
     @State private var dropTargetedRow: Int? = nil
     @State private var dropTargetedNewRow: Bool = false
 
-    init(chartId: UUID, columnCount: Int) {
+    init(chartId: UUID, columnCount: Int, wiring: WiringState) {
         self.chartId = chartId
         self.columnCount = columnCount
+        self.wiring = wiring
 
         let id = chartId
         _timers = Query(
@@ -61,19 +67,20 @@ struct GanttCanvasView: View {
         )
     }
 
-    /// Polymorphic wrapper so all brick types can render together
-    /// in a single 2D grid render loop.
+    /// Polymorphic wrapper so renderable bricks can share a render
+    /// loop. Per M5.7 (Michael 2026-05-19), traces no longer render
+    /// as rows — they live purely as overlay edges drawn between
+    /// brick frames in `traceEdgeOverlay`. Only Timer, Gate, and
+    /// Supplemental bricks render in the grid.
     private enum CanvasBrick: Identifiable {
         case timer(TimerModuleData)
         case gate(GateBrickData)
-        case trace(TraceData)
         case supplemental(SupplementalBrickData)
 
         var id: UUID {
             switch self {
             case .timer(let t):        return t.id
             case .gate(let g):         return g.id
-            case .trace(let r):        return r.id
             case .supplemental(let s): return s.id
             }
         }
@@ -82,7 +89,6 @@ struct GanttCanvasView: View {
             switch self {
             case .timer(let t):        return t.order
             case .gate(let g):         return g.order
-            case .trace(let r):        return r.order
             case .supplemental(let s): return s.order
             }
         }
@@ -91,7 +97,6 @@ struct GanttCanvasView: View {
             switch self {
             case .timer(let t):        return t.column
             case .gate(let g):         return g.column
-            case .trace(let r):        return r.column
             case .supplemental(let s): return s.column
             }
         }
@@ -100,9 +105,8 @@ struct GanttCanvasView: View {
     private var allBricks: [CanvasBrick] {
         let t = timers.map        { CanvasBrick.timer($0) }
         let g = gates.map         { CanvasBrick.gate($0) }
-        let r = traces.map        { CanvasBrick.trace($0) }
         let s = supplementals.map { CanvasBrick.supplemental($0) }
-        return t + g + r + s
+        return t + g + s
     }
 
     /// Bricks grouped by row, with each row's bricks sorted by column.
@@ -216,17 +220,48 @@ struct GanttCanvasView: View {
         switch brick {
         case .timer(let timer):
             TimerModuleBrickView(data: timer)
+                .wiringOverlay(id: timer.id, wiring: wiring) { tappedBrick(timer.id) }
         case .gate(let gate):
             GateBrickView(data: gate)
-        case .trace(let trace):
-            TraceBrickView(
-                data: trace,
-                timerCandidates: timers,
-                gateCandidates: gates
-            )
+                .wiringOverlay(id: gate.id, wiring: wiring) { tappedBrick(gate.id) }
         case .supplemental(let sup):
             SupplementalBrickView(data: sup)
+                .wiringOverlay(id: sup.id, wiring: wiring) { tappedBrick(sup.id) }
         }
+    }
+
+    /// Called when a brick is tapped while the canvas is in wiring
+    /// mode. Drives the tap-to-wire state machine: first tap picks
+    /// the source, second tap creates the wire to that destination.
+    private func tappedBrick(_ brickId: UUID) {
+        guard wiring.isWiring else { return }
+        switch wiring.mode {
+        case .idle:
+            return
+        case .awaitingSource:
+            wiring.pickedSource(brickId)
+        case .awaitingDestination:
+            if let sourceId = wiring.pickedDestination(brickId) {
+                createWire(from: sourceId, to: brickId)
+            }
+        }
+    }
+
+    /// Create a TraceData connecting the two bricks via the
+    /// tap-to-wire flow. Default to FS (Finish → Start) with no
+    /// lag; the user adjusts via the trace's popover (future).
+    private func createWire(from sourceId: UUID, to destId: UUID) {
+        let new = TraceData(
+            traceType: .fsEdge,
+            sourceBrickId: sourceId,
+            destinationBrickIds: [destId],
+            lagSeconds: 0,
+            order: 0,
+            column: 0,
+            ganttChartId: chartId,
+            notation: ""
+        )
+        modelContext.insert(new)
     }
 
     /// Right-side drop zone within a row — drop here to append a
@@ -374,15 +409,11 @@ struct GanttCanvasView: View {
             return true
 
         case .trace:
-            let new = TraceData(
-                traceType: .fsEdge,
-                order: row,
-                column: column,
-                ganttChartId: chartId,
-                notation: ""
-            )
-            modelContext.insert(new)
-            return true
+            // M5.7: traces are now created via tap-to-wire, not by
+            // dragging the palette tile onto the canvas. The Trace
+            // tile uses .onTapGesture (no .draggable) so this case
+            // shouldn't be hit — but guard defensively.
+            return false
 
         case .fsEdge, .ssEdge, .ffEdge, .sfEdge, .lagLead, .splitter:
             return false  // not palette tiles
