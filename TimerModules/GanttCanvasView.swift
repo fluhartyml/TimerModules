@@ -17,9 +17,10 @@ import SwiftData
 
 struct GanttCanvasView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \TimerModuleData.order) private var timers: [TimerModuleData]
-    @Query(sort: \GateBrickData.order)   private var gates:  [GateBrickData]
-    @Query(sort: \TraceData.order)       private var traces: [TraceData]
+    @Query(sort: \TimerModuleData.order)       private var timers:        [TimerModuleData]
+    @Query(sort: \GateBrickData.order)         private var gates:         [GateBrickData]
+    @Query(sort: \TraceData.order)             private var traces:        [TraceData]
+    @Query(sort: \SupplementalBrickData.order) private var supplementals: [SupplementalBrickData]
 
     @State private var isDropTargeted: Bool = false
     @State private var brickFrames: [UUID: CGRect] = [:]
@@ -30,29 +31,33 @@ struct GanttCanvasView: View {
         case timer(TimerModuleData)
         case gate(GateBrickData)
         case trace(TraceData)
+        case supplemental(SupplementalBrickData)
 
         var id: UUID {
             switch self {
-            case .timer(let t): return t.id
-            case .gate(let g):  return g.id
-            case .trace(let r): return r.id
+            case .timer(let t):        return t.id
+            case .gate(let g):         return g.id
+            case .trace(let r):        return r.id
+            case .supplemental(let s): return s.id
             }
         }
 
         var order: Int {
             switch self {
-            case .timer(let t): return t.order
-            case .gate(let g):  return g.order
-            case .trace(let r): return r.order
+            case .timer(let t):        return t.order
+            case .gate(let g):         return g.order
+            case .trace(let r):        return r.order
+            case .supplemental(let s): return s.order
             }
         }
     }
 
     private var canvasBricks: [CanvasBrick] {
-        let t = timers.map { CanvasBrick.timer($0) }
-        let g = gates.map  { CanvasBrick.gate($0) }
-        let r = traces.map { CanvasBrick.trace($0) }
-        return (t + g + r).sorted { $0.order < $1.order }
+        let t = timers.map        { CanvasBrick.timer($0) }
+        let g = gates.map         { CanvasBrick.gate($0) }
+        let r = traces.map        { CanvasBrick.trace($0) }
+        let s = supplementals.map { CanvasBrick.supplemental($0) }
+        return (t + g + r + s).sorted { $0.order < $1.order }
     }
 
     var body: some View {
@@ -147,6 +152,8 @@ struct GanttCanvasView: View {
                 timerCandidates: timers,
                 gateCandidates: gates
             )
+        case .supplemental(let sup):
+            SupplementalBrickView(data: sup)
         }
     }
 
@@ -176,9 +183,10 @@ struct GanttCanvasView: View {
 
     private func delete(_ brick: CanvasBrick) {
         switch brick {
-        case .timer(let t): modelContext.delete(t)
-        case .gate(let g):  modelContext.delete(g)
-        case .trace(let r): modelContext.delete(r)
+        case .timer(let t):        modelContext.delete(t)
+        case .gate(let g):         modelContext.delete(g)
+        case .trace(let r):        modelContext.delete(r)
+        case .supplemental(let s): modelContext.delete(s)
         }
     }
 
@@ -319,16 +327,24 @@ struct GanttCanvasView: View {
             // false for these. Guard anyway.
             return false
 
-        default:
-            // Supplemental bricks land here (M5).
-            return false
+        case .note, .marker, .trigger, .action,
+             .group, .variable, .webhook,
+             .conditional, .loop:
+            let new = SupplementalBrickData(
+                brickType: type,
+                order: nextOrder,
+                notation: ""
+            )
+            modelContext.insert(new)
+            return true
         }
     }
 
     private func nextAvailableOrder() -> Int {
-        let highestTimer = timers.map(\.order).max() ?? -1
-        let highestGate  = gates.map(\.order).max() ?? -1
-        let highestTrace = traces.map(\.order).max() ?? -1
-        return max(highestTimer, highestGate, highestTrace) + 1
+        let highestTimer        = timers.map(\.order).max() ?? -1
+        let highestGate         = gates.map(\.order).max() ?? -1
+        let highestTrace        = traces.map(\.order).max() ?? -1
+        let highestSupplemental = supplementals.map(\.order).max() ?? -1
+        return max(highestTimer, highestGate, highestTrace, highestSupplemental) + 1
     }
 }

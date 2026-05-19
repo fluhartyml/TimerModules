@@ -183,8 +183,8 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     /// Whether this brick type is fully wired up in v1.0 of the build.
     /// M2 wires .timerModule; M3 flips the seven boolean logic gates;
     /// M4 unifies the trace brick (.trace) — internal type values
-    /// (fsEdge etc.) remain as configurable values; M5 flips
-    /// supplementals.
+    /// (fsEdge etc.) remain as configurable values; M5 flips the
+    /// nine supplemental types.
     var isWiredUp: Bool {
         switch self {
         case .timerModule,
@@ -192,10 +192,11 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
              .nandGate, .xorGate, .xnorGate,
              .trace,
              .fsEdge, .ssEdge, .ffEdge, .sfEdge,
-             .lagLead, .splitter:
+             .lagLead, .splitter,
+             .note, .marker, .trigger, .action,
+             .group, .variable, .webhook,
+             .conditional, .loop:
             return true
-        default:
-            return false
         }
     }
 

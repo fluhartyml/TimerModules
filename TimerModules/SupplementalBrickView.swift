@@ -1,0 +1,405 @@
+// MARK: - SupplementalBrickView
+//
+// Renders one of the nine supplemental brick types as a
+// configurable card on the Gantt canvas. The view dispatches on
+// `data.brickType` to a per-type config UI.
+//
+// Each brick gets the same header (icon, name, notation
+// TextField) and then a type-specific body.
+
+import SwiftUI
+import SwiftData
+
+struct SupplementalBrickView: View {
+    @Bindable var data: SupplementalBrickData
+
+    private var brickType: BrickType { data.brickType }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            typeSpecificBody
+            notationField
+        }
+        .padding(18)
+        .frame(maxWidth: 360)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(brickColor.opacity(0.4), lineWidth: 1)
+        )
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            Image(systemName: brickType.symbolName ?? "square")
+                .font(.system(size: 22))
+                .foregroundStyle(brickColor)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(brickType.displayName)
+                    .font(.headline)
+                Text(typeDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+    }
+
+    private var typeDescription: String {
+        switch brickType {
+        case .note:         return "Annotation"
+        case .marker:       return "Milestone marker"
+        case .trigger:      return "Entry point"
+        case .action:       return "Side effect"
+        case .group:        return "Container"
+        case .variable:     return "Counter"
+        case .webhook:      return "HTTP outbound"
+        case .conditional:  return "If / Else"
+        case .loop:         return "Repeat"
+        default:            return ""
+        }
+    }
+
+    // MARK: Type-specific body
+
+    @ViewBuilder
+    private var typeSpecificBody: some View {
+        switch brickType {
+        case .note:        noteBody
+        case .marker:      markerBody
+        case .trigger:     triggerBody
+        case .action:      actionBody
+        case .group:       groupBody
+        case .variable:    variableBody
+        case .webhook:     webhookBody
+        case .conditional: conditionalBody
+        case .loop:        loopBody
+        default:           EmptyView()
+        }
+    }
+
+    // MARK: Note
+
+    private var noteBody: some View {
+        TextField("Type your note…", text: $data.textContent, axis: .vertical)
+            .lineLimit(3...6)
+            .font(.system(size: 16))
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 8).fill(Color.purple.opacity(0.08))
+            )
+    }
+
+    // MARK: Marker
+
+    private var markerBody: some View {
+        HStack {
+            Image(systemName: "diamond.fill")
+                .foregroundStyle(Color(hex: data.markerColorHex) ?? .yellow)
+                .font(.system(size: 36))
+            Spacer()
+            ColorPicker("Color", selection: Binding(
+                get: { Color(hex: data.markerColorHex) ?? .yellow },
+                set: { data.markerColorHex = $0.toHex() ?? "#FFB000" }
+            ))
+            .labelsHidden()
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: Trigger
+
+    private var triggerBody: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Picker("Kind", selection: $data.kindRaw) {
+                Text("Manual").tag("manual")
+                Text("Scheduled").tag("scheduled")
+                Text("External").tag("external")
+            }
+            .pickerStyle(.segmented)
+
+            if data.kindRaw == "scheduled" {
+                TextField("Schedule (e.g. daily 9am, every Monday)…",
+                          text: $data.configString)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.subheadline)
+            }
+
+            Button {
+                fireTrigger()
+            } label: {
+                Label("Start", systemImage: "play.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
+        }
+    }
+
+    private func fireTrigger() {
+        // Signal-routing layer (post-M5) will propagate this. For now
+        // the button is the entry-point affordance.
+        data.updatedDate = Date()
+    }
+
+    // MARK: Action
+
+    private var actionBody: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Picker("Kind", selection: $data.kindRaw) {
+                Text("Sound").tag("sound")
+                Text("Notification").tag("notification")
+                Text("Log entry").tag("log")
+                Text("Deep link").tag("link")
+            }
+            .pickerStyle(.menu)
+
+            TextField(actionConfigPlaceholder, text: $data.configString)
+                .textFieldStyle(.roundedBorder)
+                .font(.subheadline)
+        }
+    }
+
+    private var actionConfigPlaceholder: String {
+        switch data.kindRaw {
+        case "sound":         return "System sound name"
+        case "notification":  return "Notification message"
+        case "log":           return "Log message"
+        case "link":          return "URL to open"
+        default:              return "Config"
+        }
+    }
+
+    // MARK: Group
+
+    private var groupBody: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("\(data.containedBrickIds.count) brick(s) grouped")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text("Tap a brick to add to this group (signal-routing layer wires this up).")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    // MARK: Variable
+
+    private var variableBody: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Text("Value").foregroundStyle(.secondary)
+                Spacer()
+                Text("\(data.variableValue, specifier: "%.0f")")
+                    .font(.system(size: 28, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.primary)
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    data.variableValue -= 1
+                    data.updatedDate = Date()
+                } label: {
+                    Image(systemName: "minus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                Button {
+                    data.variableValue += 1
+                    data.updatedDate = Date()
+                } label: {
+                    Image(systemName: "plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                Button {
+                    data.variableValue = data.variableInitial
+                    data.updatedDate = Date()
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+            .font(.subheadline)
+
+            HStack {
+                Text("Initial").foregroundStyle(.secondary)
+                Spacer()
+                Stepper(
+                    value: $data.variableInitial,
+                    in: -1000...1000,
+                    step: 1
+                ) {
+                    Text("\(data.variableInitial, specifier: "%.0f")")
+                        .monospacedDigit()
+                }
+            }
+            .font(.subheadline)
+        }
+    }
+
+    // MARK: Webhook
+
+    private var webhookBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Picker("Method", selection: $data.kindRaw) {
+                    Text("GET").tag("GET")
+                    Text("POST").tag("POST")
+                    Text("PUT").tag("PUT")
+                    Text("DELETE").tag("DELETE")
+                }
+                .pickerStyle(.menu)
+                .frame(width: 100)
+                Spacer()
+            }
+
+            TextField("https://…", text: $data.configString)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 14, design: .monospaced))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+
+            if data.kindRaw != "GET" {
+                TextField("Request body (JSON or form-encoded)",
+                          text: $data.bodyContent, axis: .vertical)
+                    .lineLimit(2...4)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 13, design: .monospaced))
+            }
+        }
+    }
+
+    // MARK: Conditional
+
+    private var conditionalBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Condition")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            TextField("e.g. variable > 5", text: $data.textContent)
+                .textFieldStyle(.roundedBorder)
+                .font(.subheadline)
+
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("True branch")
+                        .font(.caption2)
+                        .foregroundStyle(.green)
+                    Text("\(data.containedBrickIds.count) brick(s)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .leading) {
+                    Text("False branch")
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                    Text("\(data.alternateBrickIds.count) brick(s)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    // MARK: Loop
+
+    private var loopBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Repeat").foregroundStyle(.secondary)
+                Spacer()
+                Stepper(
+                    value: $data.loopCount,
+                    in: 1...1000
+                ) {
+                    Text("\(data.loopCount)×")
+                        .monospacedDigit()
+                }
+            }
+            .font(.subheadline)
+
+            Text("\(data.containedBrickIds.count) brick(s) in loop body")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    // MARK: Notation field (shared)
+
+    private var notationField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "pencil.line")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+            TextField("Label this brick", text: $data.notation)
+                .font(.system(size: 16, weight: .medium))
+                .textFieldStyle(.plain)
+                .submitLabel(.done)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(.thinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(brickColor.opacity(0.25), lineWidth: 1)
+        )
+    }
+
+    // MARK: Color per supplemental type
+
+    private var brickColor: Color {
+        switch brickType {
+        case .note:         return .purple
+        case .marker:       return .yellow
+        case .trigger:      return .green
+        case .action:       return .pink
+        case .group:        return .gray
+        case .variable:     return .mint
+        case .webhook:      return .cyan
+        case .conditional:  return .indigo
+        case .loop:         return .brown
+        default:            return .gray
+        }
+    }
+}
+
+// MARK: - Color hex helpers
+
+extension Color {
+    init?(hex: String) {
+        var h = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if h.hasPrefix("#") { h.removeFirst() }
+        guard h.count == 6, let v = UInt64(h, radix: 16) else { return nil }
+        let r = Double((v >> 16) & 0xFF) / 255.0
+        let g = Double((v >> 8)  & 0xFF) / 255.0
+        let b = Double( v        & 0xFF) / 255.0
+        self.init(red: r, green: g, blue: b)
+    }
+
+    func toHex() -> String? {
+        // SwiftUI's Color doesn't expose RGB components directly across
+        // platforms. We round-trip via the resolved color where we can.
+        #if canImport(UIKit)
+        let ui = UIColor(self)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
+        return String(format: "#%02X%02X%02X",
+                      Int(round(r * 255)),
+                      Int(round(g * 255)),
+                      Int(round(b * 255)))
+        #else
+        return nil
+        #endif
+    }
+}
