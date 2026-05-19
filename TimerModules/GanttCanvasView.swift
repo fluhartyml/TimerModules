@@ -329,24 +329,32 @@ struct GanttCanvasView: View {
         modelContext.insert(new)
     }
 
-    /// Right-side drop zone within a row — drop here to append a
-    /// brick to this row in the next column position.
+    /// Right-side drop zone within a row — tap to pick a card type
+    /// from a menu, or drag onto it to drop a card. Either way the
+    /// new card is added at the next column position in this row.
     private func addToRowDropZone(_ rowIndex: Int) -> some View {
         let isTargeted = (dropTargetedRow == rowIndex)
-        return ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(
-                    isTargeted ? Color.accentColor : Color.secondary.opacity(0.35),
-                    style: StrokeStyle(lineWidth: 1.4, dash: [5, 4])
-                )
-            VStack(spacing: 4) {
-                Image(systemName: "plus")
-                Text(isTargeted ? "Add to row" : "+")
-                    .font(.caption2)
+        return Menu {
+            cardPickerMenu(row: rowIndex, column: nextColumn(for: rowIndex))
+        } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(
+                        isTargeted ? Color.accentColor : Color.secondary.opacity(0.35),
+                        style: StrokeStyle(lineWidth: 1.4, dash: [5, 4])
+                    )
+                VStack(spacing: 4) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .semibold))
+                    Text(isTargeted ? "Add to row" : "Add card")
+                        .font(.caption2)
+                }
+                .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
             }
-            .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
+            .frame(width: 100, height: 200)
+            .contentShape(Rectangle())
         }
-        .frame(width: 100, height: 200)
+        .buttonStyle(.plain)
         .dropDestination(for: BrickType.self) { items, _ in
             handleDrop(items, targetRow: rowIndex, targetColumn: nextColumn(for: rowIndex))
         } isTargeted: { targeted in
@@ -354,24 +362,65 @@ struct GanttCanvasView: View {
         }
     }
 
+    /// Menu of card types that mirrors the palette grouping. Tapping
+    /// a row inserts that card at the given row + column position.
+    @ViewBuilder
+    private func cardPickerMenu(row: Int, column: Int) -> some View {
+        Section("Functional") {
+            Button("Timer") { addCard(.timerModule, row: row, column: column) }
+        }
+        Section("Logic gates") {
+            Button("AND")  { addCard(.andGate,  row: row, column: column) }
+            Button("OR")   { addCard(.orGate,   row: row, column: column) }
+            Button("NOT")  { addCard(.notGate,  row: row, column: column) }
+            Button("NOR")  { addCard(.norGate,  row: row, column: column) }
+            Button("NAND") { addCard(.nandGate, row: row, column: column) }
+            Button("XOR")  { addCard(.xorGate,  row: row, column: column) }
+            Button("XNOR") { addCard(.xnorGate, row: row, column: column) }
+        }
+        Section("Supplemental") {
+            Button("Note")       { addCard(.note,        row: row, column: column) }
+            Button("Marker")     { addCard(.marker,      row: row, column: column) }
+            Button("Trigger")    { addCard(.trigger,     row: row, column: column) }
+            Button("Action")     { addCard(.action,      row: row, column: column) }
+            Button("Group")      { addCard(.group,       row: row, column: column) }
+            Button("Variable")   { addCard(.variable,    row: row, column: column) }
+            Button("Webhook")    { addCard(.webhook,     row: row, column: column) }
+            Button("Conditional"){ addCard(.conditional, row: row, column: column) }
+            Button("Loop")       { addCard(.loop,        row: row, column: column) }
+            Button("End")        { addCard(.endBrick,    row: row, column: column) }
+        }
+    }
+
+    /// Tap-to-add bridge — delegates to handleDrop using a
+    /// single-element items array.
+    private func addCard(_ type: BrickType, row: Int, column: Int) {
+        _ = handleDrop([type], targetRow: row, targetColumn: column)
+    }
+
     // MARK: Add-new-row drop zone
 
     private var addNewRowDropZone: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(
-                    dropTargetedNewRow ? Color.accentColor : Color.secondary.opacity(0.4),
-                    style: StrokeStyle(lineWidth: 1.5, dash: [6, 5])
-                )
-
-            HStack(spacing: 8) {
-                Image(systemName: "plus.rectangle.on.rectangle")
-                Text(dropTargetedNewRow ? "Release to add a new row" : "Drop a brick here to add a new row")
-                    .font(.subheadline)
+        Menu {
+            cardPickerMenu(row: nextAvailableRow(), column: 0)
+        } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(
+                        dropTargetedNewRow ? Color.accentColor : Color.secondary.opacity(0.4),
+                        style: StrokeStyle(lineWidth: 1.5, dash: [6, 5])
+                    )
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.rectangle.on.rectangle")
+                    Text(dropTargetedNewRow ? "Release to add a new row" : "Tap to add a card to a new row")
+                        .font(.subheadline)
+                }
+                .foregroundStyle(dropTargetedNewRow ? Color.accentColor : .secondary)
             }
-            .foregroundStyle(dropTargetedNewRow ? Color.accentColor : .secondary)
+            .frame(height: 64)
+            .contentShape(Rectangle())
         }
-        .frame(height: 64)
+        .buttonStyle(.plain)
         .dropDestination(for: BrickType.self) { items, _ in
             handleDrop(items, targetRow: nextAvailableRow(), targetColumn: 0)
         } isTargeted: { targeted in
