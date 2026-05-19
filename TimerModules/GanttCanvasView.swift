@@ -157,7 +157,7 @@ struct GanttCanvasView: View {
             Image(systemName: "rectangle.3.group")
                 .font(.system(size: 48))
                 .foregroundStyle(.tertiary)
-            Text("Drag a brick here to start your Gantt")
+            Text("Drag a brick here to start your Timer Module")
                 .font(.title3)
                 .foregroundStyle(.secondary)
             Text("Stack rows vertically for parallel tracks; line bricks up horizontally for sequence.")

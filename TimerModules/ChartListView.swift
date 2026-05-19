@@ -41,13 +41,16 @@ struct ChartListView: View {
                 chartList
             }
         }
-        .navigationTitle("My Gantt Charts")
+        .navigationTitle("My Timer Modules")
+        #if os(macOS)
+        .navigationSubtitle("Gantt charts (internal nomenclature)")
+        #endif
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     createNewChart()
                 } label: {
-                    Label("New Chart", systemImage: "plus")
+                    Label("New Timer Module", systemImage: "plus")
                 }
             }
         }
@@ -55,7 +58,7 @@ struct ChartListView: View {
             bootstrapIfNeeded()
         }
         .confirmationDialog(
-            "Delete this chart?",
+            "Delete this Timer Module?",
             isPresented: $showingDeleteConfirm,
             presenting: chartToDelete
         ) { chart in
@@ -63,7 +66,7 @@ struct ChartListView: View {
                 deleteChart(chart)
             }
         } message: { _ in
-            Text("All bricks and log entries in this chart will be deleted. This can't be undone.")
+            Text("All bricks and log entries in this Timer Module will be deleted. This can't be undone.")
         }
     }
 
@@ -74,16 +77,16 @@ struct ChartListView: View {
             Image(systemName: "rectangle.3.group")
                 .font(.system(size: 56))
                 .foregroundStyle(.tertiary)
-            Text("No Gantt charts yet")
+            Text("No Timer Modules yet")
                 .font(.title2)
-            Text("Create your first chart to start building a program.")
+            Text("Create your first Timer Module to start building a program.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button {
                 createNewChart()
             } label: {
-                Label("New Chart", systemImage: "plus")
+                Label("New Timer Module", systemImage: "plus")
                     .font(.headline)
             }
             .buttonStyle(.borderedProminent)
@@ -107,6 +110,14 @@ struct ChartListView: View {
                         showingDeleteConfirm = true
                     } label: {
                         Label("Delete", systemImage: "trash")
+                    }
+                }
+                .contextMenu {
+                    Button(role: .destructive) {
+                        chartToDelete = chart
+                        showingDeleteConfirm = true
+                    } label: {
+                        Label("Delete Timer Module", systemImage: "trash")
                     }
                 }
             }
@@ -143,7 +154,7 @@ struct ChartListView: View {
     private func bootstrapIfNeeded() {
         if charts.isEmpty {
             let firstChart = GanttChartData(
-                name: "My First Gantt",
+                name: "My First Timer Module",
                 notation: "",
                 columnCount: 1
             )
@@ -169,7 +180,7 @@ struct ChartListView: View {
     }
 
     private func createNewChart() {
-        let nextName = "New Gantt \(charts.count + 1)"
+        let nextName = "Timer Module \(charts.count + 1)"
         let chart = GanttChartData(name: nextName, columnCount: 1)
         modelContext.insert(chart)
     }
