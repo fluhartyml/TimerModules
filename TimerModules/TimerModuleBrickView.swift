@@ -91,10 +91,15 @@ struct TimerModuleBrickView: View {
             notationField
             modeAndDurationControls
             analogDial
+            // Reserve a fixed height for the start/stop button row
+            // so the brick's overall frame doesn't shift between
+            // idle / running / paused states (Michael caught the
+            // resulting visual "trace arrow jump" 2026-05-19).
             startStopReset
+                .frame(height: 44)
         }
         .padding(20)
-        .frame(maxWidth: 360)
+        .frame(width: 320, height: 500, alignment: .top)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
         .onReceive(ticker) { now in
             if isRunning {

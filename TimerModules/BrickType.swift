@@ -63,6 +63,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     case webhook
     case conditional
     case loop
+    case endBrick    // M5.7 — terminates the program when reached
 
     var id: String { rawValue }
 
@@ -91,7 +92,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
             return .logicGate
         case .trace, .fsEdge, .ssEdge, .ffEdge, .sfEdge, .lagLead, .splitter:
             return .connector
-        case .note, .marker, .trigger, .action, .group, .variable, .webhook, .conditional, .loop:
+        case .note, .marker, .trigger, .action, .group, .variable, .webhook, .conditional, .loop, .endBrick:
             return .supplemental
         }
     }
@@ -136,6 +137,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         case .webhook:      return "Webhook"
         case .conditional:  return "If/Else"
         case .loop:         return "Loop"
+        case .endBrick:     return "End"
         }
     }
 
@@ -162,6 +164,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         case .webhook:      return "network"
         case .conditional:  return "questionmark.diamond"
         case .loop:         return "arrow.clockwise"
+        case .endBrick:     return "stop.circle.fill"
         }
     }
 
@@ -195,7 +198,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
              .lagLead, .splitter,
              .note, .marker, .trigger, .action,
              .group, .variable, .webhook,
-             .conditional, .loop:
+             .conditional, .loop, .endBrick:
             return true
         }
     }

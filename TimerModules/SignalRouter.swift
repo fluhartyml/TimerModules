@@ -260,6 +260,21 @@ enum SignalRouter {
         guard let chartId = sup.ganttChartId else { return }
 
         switch sup.brickType {
+        case .endBrick:
+            // Program flow reached an End brick — terminate the run.
+            // Halt running timers, end the heartbeat, log it.
+            stopAllRunningTimers(chartId: chartId, in: context)
+            runners[chartId]?.stopByEndBrick(in: context)
+            log(
+                eventType: "endBrickReached",
+                brickId: sup.id,
+                brickTypeRaw: sup.brickTypeRaw,
+                brickNotation: sup.notation,
+                ganttChartId: chartId,
+                runId: runId,
+                in: context
+            )
+
         case .action:
             log(
                 eventType: "actionExecuted",

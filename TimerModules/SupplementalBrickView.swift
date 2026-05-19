@@ -61,6 +61,7 @@ struct SupplementalBrickView: View {
         case .webhook:      return "HTTP outbound"
         case .conditional:  return "If / Else"
         case .loop:         return "Repeat"
+        case .endBrick:     return "Program end"
         default:            return ""
         }
     }
@@ -79,8 +80,29 @@ struct SupplementalBrickView: View {
         case .webhook:     webhookBody
         case .conditional: conditionalBody
         case .loop:        loopBody
+        case .endBrick:    endBody
         default:           EmptyView()
         }
+    }
+
+    // MARK: End
+
+    private var endBody: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "stop.circle.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(.red)
+            Text("Program ends here")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Text("When the program flow reaches this brick, the run halts and the summary opens.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 8)
+        }
+        .padding(.vertical, 6)
     }
 
     // MARK: Note
@@ -371,6 +393,7 @@ struct SupplementalBrickView: View {
         case .webhook:      return .cyan
         case .conditional:  return .indigo
         case .loop:         return .brown
+        case .endBrick:     return .red
         default:            return .gray
         }
     }

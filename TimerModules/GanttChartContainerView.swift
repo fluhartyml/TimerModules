@@ -127,6 +127,13 @@ struct GanttChartContainerView: View {
                 SignalRouter.register(newRunner)
             }
         }
+        // When an End brick ends the program, auto-present the
+        // summary popup (currently just the LogView).
+        .onChange(of: runner?.state) { _, newState in
+            if case .endedViaEndBrick = newState {
+                showingLog = true
+            }
+        }
         .onDisappear {
             SignalRouter.unregister(chartId: chart.id)
         }

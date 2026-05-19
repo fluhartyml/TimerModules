@@ -420,7 +420,7 @@ struct GanttCanvasView: View {
 
         case .note, .marker, .trigger, .action,
              .group, .variable, .webhook,
-             .conditional, .loop:
+             .conditional, .loop, .endBrick:
             let new = SupplementalBrickData(
                 brickType: type,
                 order: row,
