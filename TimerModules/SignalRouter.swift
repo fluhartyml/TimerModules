@@ -62,6 +62,39 @@ enum SignalRouter {
         propagate(from: trigger.id, in: chartId, runId: runId, in: context)
     }
 
+    /// Halts every running timer in the chart, accumulating their
+    /// elapsed time. Called when the user presses Stop so the
+    /// program ending also stops the individual timers — otherwise
+    /// timers keep counting in the background despite the program
+    /// state being "ended" (Michael caught this bug 2026-05-19).
+    static func stopAllRunningTimers(chartId: UUID, in context: ModelContext) {
+        let runId = currentRunId(for: chartId)
+        let runningTimers = (try? context.fetch(
+            FetchDescriptor<TimerModuleData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.runningSince != nil }
+            )
+        )) ?? []
+
+        for timer in runningTimers {
+            if let started = timer.runningSince {
+                timer.accumulatedSeconds += Date().timeIntervalSince(started)
+            }
+            timer.runningSince = nil
+            timer.updatedDate = Date()
+
+            log(
+                eventType: "timerHaltedByStop",
+                brickId: timer.id,
+                brickTypeRaw: BrickType.timerModule.rawValue,
+                brickNotation: timer.notation,
+                ganttChartId: chartId,
+                elapsedSeconds: timer.accumulatedSeconds,
+                runId: runId,
+                in: context
+            )
+        }
+    }
+
     /// Called when the toolbar Start button is pressed. Starts the
     /// chart's heartbeat runner, then fires every brick on row 0
     /// as the program's entry-point set (Michael 2026-05-19 — row

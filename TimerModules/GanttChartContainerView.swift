@@ -85,6 +85,11 @@ struct GanttChartContainerView: View {
                             SignalRouter.startProgram(chartId: chart.id, in: modelContext)
                         },
                         onStop: {
+                            // Halt all running timers in the chart so they
+                            // don't keep counting in the background after
+                            // the program state is "stopped" (Michael
+                            // caught this bug 2026-05-19).
+                            SignalRouter.stopAllRunningTimers(chartId: chart.id, in: modelContext)
                             runner.stopByUser(in: modelContext)
                             showingLog = true
                         },
