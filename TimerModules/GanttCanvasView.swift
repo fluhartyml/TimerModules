@@ -1,13 +1,14 @@
 // MARK: - GanttCanvasView
 //
 // The Gantt canvas — vertical list of rows where bricks live.
-// Drop a brick from BrickPaletteView onto the canvas (or its empty
-// drop zone) to create a new instance. Existing TimerModuleData
-// instances render as rows, each containing a TimerModuleBrickView.
+// Drop a brick from BrickPaletteView onto the canvas or its
+// add-row drop zone to create a new instance. Timer modules and
+// logic gates interleave on the canvas by their `order` field.
 //
-// M2 wires Timer module bricks end-to-end. Other brick types
-// (gates, PM edges, supplemental) accept drops at the canvas level
-// but show a placeholder row until their wiring lands in M3-M5.
+// M2 wires .timerModule end-to-end.
+// M3 wires the seven boolean logic gates end-to-end (.andGate,
+// .orGate, .notGate, .norGate, .nandGate, .xorGate, .xnorGate).
+// M4 wires PM-dependency traces; M5 wires supplemental bricks.
 
 import SwiftUI
 import SwiftData
@@ -15,13 +16,42 @@ import SwiftData
 struct GanttCanvasView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \TimerModuleData.order) private var timers: [TimerModuleData]
+    @Query(sort: \GateBrickData.order) private var gates: [GateBrickData]
 
     @State private var isDropTargeted: Bool = false
+
+    /// Polymorphic wrapper so timers and gates can interleave in a
+    /// single ordered render loop.
+    private enum CanvasBrick: Identifiable {
+        case timer(TimerModuleData)
+        case gate(GateBrickData)
+
+        var id: UUID {
+            switch self {
+            case .timer(let t): return t.id
+            case .gate(let g):  return g.id
+            }
+        }
+
+        var order: Int {
+            switch self {
+            case .timer(let t): return t.order
+            case .gate(let g):  return g.order
+            }
+        }
+    }
+
+    /// Combined timer + gate bricks, sorted by `order` for rendering.
+    private var canvasBricks: [CanvasBrick] {
+        let t = timers.map { CanvasBrick.timer($0) }
+        let g = gates.map  { CanvasBrick.gate($0) }
+        return (t + g).sorted { $0.order < $1.order }
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
-                if timers.isEmpty {
+                if canvasBricks.isEmpty {
                     emptyCanvasHint
                         .dropDestination(for: BrickType.self) { items, _ in
                             handleDrop(items)
@@ -29,8 +59,8 @@ struct GanttCanvasView: View {
                             isDropTargeted = targeted
                         }
                 } else {
-                    ForEach(timers) { timer in
-                        timerRow(for: timer)
+                    ForEach(canvasBricks) { brick in
+                        canvasRow(for: brick)
                     }
                 }
 
@@ -62,7 +92,7 @@ struct GanttCanvasView: View {
             Text("Drag a brick here to start your Gantt")
                 .font(.title3)
                 .foregroundStyle(.secondary)
-            Text("Try the Timer tile from the palette above.")
+            Text("Try the Timer tile or any logic gate from the palette above.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -77,20 +107,26 @@ struct GanttCanvasView: View {
         )
     }
 
-    // MARK: Timer row
+    // MARK: Canvas row (polymorphic)
 
-    private func timerRow(for timer: TimerModuleData) -> some View {
+    @ViewBuilder
+    private func canvasRow(for brick: CanvasBrick) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            rowHandle(for: timer)
-            TimerModuleBrickView(data: timer)
+            rowHandle(for: brick)
+            switch brick {
+            case .timer(let timer):
+                TimerModuleBrickView(data: timer)
+            case .gate(let gate):
+                GateBrickView(data: gate)
+            }
             Spacer(minLength: 0)
         }
     }
 
     /// Row handle on the left with the row number and a delete affordance.
-    private func rowHandle(for timer: TimerModuleData) -> some View {
+    private func rowHandle(for brick: CanvasBrick) -> some View {
         VStack(spacing: 6) {
-            Text("\(timer.order + 1)")
+            Text("\(brick.order + 1)")
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 28)
@@ -99,7 +135,7 @@ struct GanttCanvasView: View {
                 )
 
             Button {
-                modelContext.delete(timer)
+                delete(brick)
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 12))
@@ -109,6 +145,13 @@ struct GanttCanvasView: View {
             .help("Delete this row")
         }
         .padding(.top, 8)
+    }
+
+    private func delete(_ brick: CanvasBrick) {
+        switch brick {
+        case .timer(let t): modelContext.delete(t)
+        case .gate(let g):  modelContext.delete(g)
+        }
     }
 
     // MARK: Add-row drop zone
@@ -137,14 +180,14 @@ struct GanttCanvasView: View {
     private func handleDrop(_ items: [BrickType]) -> Bool {
         guard let type = items.first else { return false }
         guard type.isWiredUp else {
-            // Type isn't wired yet (M3+ work); silently no-op.
-            // Visual feedback in the palette already shows it as dimmed.
+            // Type isn't wired yet (M4+ work); silently no-op.
             return false
         }
 
+        let nextOrder = nextAvailableOrder()
+
         switch type {
         case .timerModule:
-            let nextOrder = (timers.map(\.order).max() ?? -1) + 1
             let new = TimerModuleData(
                 notation: "Timer \(nextOrder + 1)",
                 order: nextOrder
@@ -152,9 +195,27 @@ struct GanttCanvasView: View {
             modelContext.insert(new)
             return true
 
+        case .andGate, .orGate, .notGate, .norGate,
+             .nandGate, .xorGate, .xnorGate:
+            let new = GateBrickData(
+                gateType: type,
+                order: nextOrder,
+                notation: ""
+            )
+            modelContext.insert(new)
+            return true
+
         default:
-            // Other wired-up types land here in later milestones.
+            // PM dependencies (M4) and supplemental bricks (M5)
+            // route here when their isWiredUp flips.
             return false
         }
+    }
+
+    /// Next free `order` across both timer and gate bricks.
+    private func nextAvailableOrder() -> Int {
+        let highestTimer = timers.map(\.order).max() ?? -1
+        let highestGate  = gates.map(\.order).max() ?? -1
+        return max(highestTimer, highestGate) + 1
     }
 }

@@ -14,6 +14,7 @@ struct TimerModulesApp: App {
         let schema = Schema([
             Item.self,
             TimerModuleData.self,
+            GateBrickData.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
