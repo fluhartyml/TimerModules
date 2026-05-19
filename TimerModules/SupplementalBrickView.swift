@@ -12,6 +12,7 @@ import SwiftData
 
 struct SupplementalBrickView: View {
     @Bindable var data: SupplementalBrickData
+    @Environment(\.modelContext) private var modelContext
 
     private var brickType: BrickType { data.brickType }
 
@@ -141,9 +142,8 @@ struct SupplementalBrickView: View {
     }
 
     private func fireTrigger() {
-        // Signal-routing layer (post-M5) will propagate this. For now
-        // the button is the entry-point affordance.
         data.updatedDate = Date()
+        SignalRouter.fireProgram(from: data, in: modelContext)
     }
 
     // MARK: Action

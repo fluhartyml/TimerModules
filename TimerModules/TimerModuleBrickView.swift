@@ -19,11 +19,13 @@ import Combine
 
 struct TimerModuleBrickView: View {
     @Bindable var data: TimerModuleData
+    @Environment(\.modelContext) private var modelContext
 
     @State private var tick: Date = Date()
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     @State private var sweepAngle: Double = 0
+    @State private var lastFiredAtElapsed: TimeInterval = -1
 
     // MARK: Computed state
 
@@ -95,7 +97,15 @@ struct TimerModuleBrickView: View {
         .frame(maxWidth: 360)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
         .onReceive(ticker) { now in
-            if isRunning { tick = now }
+            if isRunning {
+                tick = now
+                // Countdown: auto-complete when remaining hits zero.
+                if data.mode == .countdown,
+                   remaining <= 0,
+                   lastFiredAtElapsed < data.durationSeconds {
+                    complete()
+                }
+            }
         }
     }
 
@@ -135,29 +145,33 @@ struct TimerModuleBrickView: View {
             .disabled(isRunning)
 
             // "Trigger at" stepper — sets the elapsed/remaining seconds
-            // when the timer fires its completion signal to downstream
-            // bricks (logic gates, traces, supplemental). Same value
-            // means different things per mode:
-            //   • countdown: total time to count down FROM (fires at 0)
-            //   • count-up:  total time to count up TO   (fires at value;
-            //                timer keeps running as a free stopwatch)
-            HStack(spacing: 12) {
-                Text("Trigger at")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Stepper(
-                    value: Binding(
-                        get: { Int(data.durationSeconds / 60) },
-                        set: { data.durationSeconds = TimeInterval($0) * 60 }
-                    ),
-                    in: 1...240
-                ) {
-                    Text("\(Int(data.durationSeconds / 60)) min")
-                        .monospacedDigit()
+            // when a COUNTDOWN timer fires its completion signal. Hidden
+            // for count-up because count-up is open-ended; the user
+            // presses Complete manually when done (Michael 2026-05-19).
+            if data.mode == .countdown {
+                HStack(spacing: 12) {
+                    Text("Trigger at")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Stepper(
+                        value: Binding(
+                            get: { Int(data.durationSeconds / 60) },
+                            set: { data.durationSeconds = TimeInterval($0) * 60 }
+                        ),
+                        in: 1...240
+                    ) {
+                        Text("\(Int(data.durationSeconds / 60)) min")
+                            .monospacedDigit()
+                    }
                 }
+                .font(.subheadline)
+                .disabled(isRunning)
+            } else {
+                Text("Count-up — press Complete when done")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .font(.subheadline)
-            .disabled(isRunning)
         }
     }
 
@@ -196,10 +210,12 @@ struct TimerModuleBrickView: View {
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
 
-                Text("Trigger at \(Int(data.durationSeconds / 60)) min")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
+                if data.mode == .countdown {
+                    Text("Trigger at \(Int(data.durationSeconds / 60)) min")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .monospacedDigit()
+                }
             }
         }
         .frame(width: 220, height: 220)
@@ -211,19 +227,34 @@ struct TimerModuleBrickView: View {
         }
     }
 
-    // MARK: Start / Stop / Reset (lifted from HOS TimerSectionView lines 132-162)
+    // MARK: Start / Stop / Complete / Reset
 
     private var startStopReset: some View {
         HStack(spacing: 12) {
             if isRunning {
-                Button {
-                    stop()
-                } label: {
-                    Label("Stop", systemImage: "stop.fill")
-                        .frame(maxWidth: .infinity)
+                if data.mode == .countdown {
+                    // Countdown: Stop = pause. Auto-completes at zero.
+                    Button {
+                        stop()
+                    } label: {
+                        Label("Stop", systemImage: "pause.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                } else {
+                    // Count-up: Complete = stop + record elapsed +
+                    // fire downstream signal (Michael 2026-05-19 —
+                    // count-up is open-ended, completion is manual).
+                    Button {
+                        complete()
+                    } label: {
+                        Label("Complete", systemImage: "checkmark.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.red)
             } else {
                 Button {
                     start()
@@ -252,6 +283,7 @@ struct TimerModuleBrickView: View {
         data.runningSince = Date()
         data.updatedDate = Date()
         tick = Date()
+        lastFiredAtElapsed = -1
     }
 
     private func stop() {
@@ -266,6 +298,30 @@ struct TimerModuleBrickView: View {
         data.accumulatedSeconds = 0
         data.runningSince = nil
         data.updatedDate = Date()
+        lastFiredAtElapsed = -1
+    }
+
+    /// Manual completion for count-up timers (Michael 2026-05-19),
+    /// AND automatic completion for countdown timers when the
+    /// remaining time reaches zero. Captures the elapsed seconds at
+    /// the moment of completion, stops the timer, fires the
+    /// downstream signal via the signal router, and logs the event.
+    private func complete() {
+        let elapsedAtComplete = elapsed
+        // Stop accumulating
+        if let started = data.runningSince {
+            data.accumulatedSeconds += Date().timeIntervalSince(started)
+            data.runningSince = nil
+            data.updatedDate = Date()
+        }
+        // Mark as fired to prevent re-firing on the same elapsed value
+        lastFiredAtElapsed = elapsedAtComplete
+        // Route downstream + log
+        SignalRouter.fireTimerCompletion(
+            data,
+            elapsed: elapsedAtComplete,
+            in: modelContext
+        )
     }
 }
 
