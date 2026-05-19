@@ -26,6 +26,7 @@ struct TraceBrickView: View {
         VStack(alignment: .leading, spacing: 14) {
             header
 
+            typePickerRow
             sourcePickerRow
             destinationPickerRow
             lagStepperRow
@@ -39,6 +40,43 @@ struct TraceBrickView: View {
             RoundedRectangle(cornerRadius: 18)
                 .stroke(traceColor.opacity(0.4), lineWidth: 1)
         )
+    }
+
+    // MARK: Type picker — the trace's adjustable relationship type.
+
+    private var typePickerRow: some View {
+        HStack {
+            Text("Type").foregroundStyle(.secondary).frame(width: 60, alignment: .leading)
+            Menu {
+                Button("FS · Finish → Start") { setTraceType(.fsEdge) }
+                Button("SS · Start → Start")  { setTraceType(.ssEdge) }
+                Button("FF · Finish → Finish") { setTraceType(.ffEdge) }
+                Button("SF · Start → Finish")  { setTraceType(.sfEdge) }
+            } label: {
+                HStack {
+                    Text(currentTypeShortLabel)
+                        .foregroundStyle(Color.accentColor)
+                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                }
+            }
+            Spacer()
+        }
+        .font(.subheadline)
+    }
+
+    private var currentTypeShortLabel: String {
+        switch traceType {
+        case .fsEdge: return "FS · Finish → Start"
+        case .ssEdge: return "SS · Start → Start"
+        case .ffEdge: return "FF · Finish → Finish"
+        case .sfEdge: return "SF · Start → Finish"
+        default:      return "FS · Finish → Start"
+        }
+    }
+
+    private func setTraceType(_ type: BrickType) {
+        data.traceTypeRaw = type.rawValue
+        data.updatedDate = Date()
     }
 
     // MARK: Header

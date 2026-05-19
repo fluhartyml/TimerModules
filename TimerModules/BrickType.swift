@@ -33,7 +33,19 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     case xorGate
     case xnorGate
 
-    // PM-dependency connectors
+    // Connector — unified trace (the single "wire" brick).
+    // Per Michael 2026-05-19: "a trace being an adjustable wire you
+    // can wire from any module to another module." Replaces the six
+    // separate FS/SS/FF/SF/Lag-Lead/Splitter tiles in the palette.
+    // The trace's RELATIONSHIP TYPE (FS / SS / FF / SF) is set on
+    // the trace's row UI, not by which tile you dragged.
+    case trace
+
+    // PM-dependency RELATIONSHIP TYPES (no longer separate palette
+    // tiles — they live as values the unified `.trace` brick can be
+    // configured to use). Kept as BrickType cases so existing
+    // TraceData rows that store one as `traceTypeRaw` continue to
+    // resolve correctly.
     case fsEdge
     case ssEdge
     case ffEdge
@@ -58,14 +70,14 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     enum Family: String, CaseIterable {
         case functional
         case logicGate
-        case pmDependency
+        case connector
         case supplemental
 
         var displayName: String {
             switch self {
             case .functional:     return "Functional"
             case .logicGate:      return "Logic gates"
-            case .pmDependency:   return "PM dependencies"
+            case .connector:      return "Connectors"
             case .supplemental:   return "Supplemental"
             }
         }
@@ -77,10 +89,23 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
             return .functional
         case .andGate, .orGate, .notGate, .norGate, .nandGate, .xorGate, .xnorGate:
             return .logicGate
-        case .fsEdge, .ssEdge, .ffEdge, .sfEdge, .lagLead, .splitter:
-            return .pmDependency
+        case .trace, .fsEdge, .ssEdge, .ffEdge, .sfEdge, .lagLead, .splitter:
+            return .connector
         case .note, .marker, .trigger, .action, .group, .variable, .webhook, .conditional, .loop:
             return .supplemental
+        }
+    }
+
+    /// Whether this brick appears in the user-facing palette.
+    /// The unified `.trace` brick is the only Connector palette tile;
+    /// the FS/SS/FF/SF/lagLead/splitter cases are internal values
+    /// the trace can be configured to use, not separate tiles.
+    var appearsInPalette: Bool {
+        switch self {
+        case .fsEdge, .ssEdge, .ffEdge, .sfEdge, .lagLead, .splitter:
+            return false
+        default:
+            return true
         }
     }
 
@@ -95,6 +120,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         case .nandGate:     return "NAND"
         case .xorGate:      return "XOR"
         case .xnorGate:     return "XNOR"
+        case .trace:        return "Trace"
         case .fsEdge:       return "FS"
         case .ssEdge:       return "SS"
         case .ffEdge:       return "FF"
@@ -122,6 +148,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         case .andGate, .orGate, .notGate, .norGate,
              .nandGate, .xorGate, .xnorGate:
             return nil  // uses textGlyph
+        case .trace:        return "point.topleft.down.curvedto.point.bottomright.up"
         case .fsEdge, .ssEdge, .ffEdge, .sfEdge:
             return "arrow.right"
         case .lagLead:      return "arrow.left.arrow.right"
@@ -155,12 +182,15 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
 
     /// Whether this brick type is fully wired up in v1.0 of the build.
     /// M2 wires .timerModule; M3 flips the seven boolean logic gates;
-    /// M4 flips the six PM-dependency types; M5 flips supplemental.
+    /// M4 unifies the trace brick (.trace) — internal type values
+    /// (fsEdge etc.) remain as configurable values; M5 flips
+    /// supplementals.
     var isWiredUp: Bool {
         switch self {
         case .timerModule,
              .andGate, .orGate, .notGate, .norGate,
              .nandGate, .xorGate, .xnorGate,
+             .trace,
              .fsEdge, .ssEdge, .ffEdge, .sfEdge,
              .lagLead, .splitter:
             return true

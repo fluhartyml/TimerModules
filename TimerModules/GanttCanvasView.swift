@@ -301,14 +301,23 @@ struct GanttCanvasView: View {
             modelContext.insert(new)
             return true
 
-        case .fsEdge, .ssEdge, .ffEdge, .sfEdge, .lagLead, .splitter:
+        case .trace:
+            // Unified trace brick — default to FS (most common Gantt
+            // edge); user adjusts type, source, destinations, lag on
+            // the trace row's pickers.
             let new = TraceData(
-                traceType: type,
+                traceType: .fsEdge,
                 order: nextOrder,
                 notation: ""
             )
             modelContext.insert(new)
             return true
+
+        case .fsEdge, .ssEdge, .ffEdge, .sfEdge, .lagLead, .splitter:
+            // Internal trace-type values, not palette tiles. Should
+            // not reach here from a drag because appearsInPalette is
+            // false for these. Guard anyway.
+            return false
 
         default:
             // Supplemental bricks land here (M5).

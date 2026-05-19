@@ -56,7 +56,7 @@ struct BrickPaletteView: View {
                 .foregroundStyle(.tertiary)
 
             HStack(spacing: 8) {
-                ForEach(BrickType.allCases.filter { $0.family == family }) { type in
+                ForEach(BrickType.allCases.filter { $0.family == family && $0.appearsInPalette }) { type in
                     paletteTile(type)
                 }
             }
