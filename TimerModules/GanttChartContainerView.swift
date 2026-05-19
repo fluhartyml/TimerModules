@@ -21,6 +21,12 @@ struct GanttChartContainerView: View {
     @State private var showingRename = false
     @State private var renameDraft: String = ""
 
+    /// When the user clicks - on the column stepper and there are
+    /// cards in the column to be removed, we present a confirmation
+    /// before destroying them (Michael 2026-05-19).
+    @State private var showingColumnRemoveConfirm = false
+    @State private var columnRemoveTarget: (column: Int, cardCount: Int) = (0, 0)
+
     /// Shared tap-to-wire state — when the user taps the Trace tile in
     /// the palette, this drives the canvas's source/destination tap
     /// flow. M5.7 (Michael 2026-05-19).
@@ -170,19 +176,100 @@ struct GanttChartContainerView: View {
     }
 
     private var columnStepper: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Image(systemName: "rectangle.split.3x1")
                 .font(.caption)
-            Stepper(
-                value: $chart.columnCount,
-                in: 1...10
-            ) {
-                Text("\(chart.columnCount)")
-                    .monospacedDigit()
-                    .font(.caption)
-                    .frame(width: 18)
+            Button {
+                attemptDecreaseColumns()
+            } label: {
+                Image(systemName: "minus.circle")
             }
-            .labelsHidden()
+            .disabled(chart.columnCount <= 1)
+            Text("\(chart.columnCount) col\(chart.columnCount == 1 ? "" : "s")")
+                .monospacedDigit()
+                .font(.caption)
+                .frame(minWidth: 36)
+            Button {
+                increaseColumns()
+            } label: {
+                Image(systemName: "plus.circle")
+            }
+            .disabled(chart.columnCount >= 10)
         }
+        .alert(
+            "Remove column \(columnRemoveTarget.column + 1)?",
+            isPresented: $showingColumnRemoveConfirm
+        ) {
+            Button("Delete \(columnRemoveTarget.cardCount) card\(columnRemoveTarget.cardCount == 1 ? "" : "s")", role: .destructive) {
+                deleteCardsInColumn(columnRemoveTarget.column)
+                chart.columnCount = max(1, chart.columnCount - 1)
+                chart.updatedDate = Date()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This column contains \(columnRemoveTarget.cardCount) card\(columnRemoveTarget.cardCount == 1 ? "" : "s"). Removing the column will delete \(columnRemoveTarget.cardCount == 1 ? "it" : "them"). This can't be undone.")
+        }
+    }
+
+    private func increaseColumns() {
+        chart.columnCount = min(10, chart.columnCount + 1)
+        chart.updatedDate = Date()
+    }
+
+    /// Decrement column count. If there are cards in the column
+    /// being removed (the highest one), prompt the user before
+    /// destroying them. Otherwise decrement silently.
+    private func attemptDecreaseColumns() {
+        let columnToRemove = chart.columnCount - 1
+        let count = countCardsInColumn(columnToRemove)
+        if count > 0 {
+            columnRemoveTarget = (column: columnToRemove, cardCount: count)
+            showingColumnRemoveConfirm = true
+        } else {
+            chart.columnCount = max(1, chart.columnCount - 1)
+            chart.updatedDate = Date()
+        }
+    }
+
+    private func countCardsInColumn(_ column: Int) -> Int {
+        let chartId = chart.id
+        let t = (try? modelContext.fetch(
+            FetchDescriptor<TimerModuleData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.column == column }
+            )
+        ))?.count ?? 0
+        let g = (try? modelContext.fetch(
+            FetchDescriptor<GateBrickData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.column == column }
+            )
+        ))?.count ?? 0
+        let s = (try? modelContext.fetch(
+            FetchDescriptor<SupplementalBrickData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.column == column }
+            )
+        ))?.count ?? 0
+        return t + g + s
+    }
+
+    private func deleteCardsInColumn(_ column: Int) {
+        let chartId = chart.id
+        let timers = (try? modelContext.fetch(
+            FetchDescriptor<TimerModuleData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.column == column }
+            )
+        )) ?? []
+        for t in timers { modelContext.delete(t) }
+        let gates = (try? modelContext.fetch(
+            FetchDescriptor<GateBrickData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.column == column }
+            )
+        )) ?? []
+        for g in gates { modelContext.delete(g) }
+        let sups = (try? modelContext.fetch(
+            FetchDescriptor<SupplementalBrickData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.column == column }
+            )
+        )) ?? []
+        for s in sups { modelContext.delete(s) }
     }
 }
