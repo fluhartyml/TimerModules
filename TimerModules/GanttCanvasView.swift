@@ -221,12 +221,36 @@ struct GanttCanvasView: View {
         case .timer(let timer):
             TimerModuleBrickView(data: timer)
                 .wiringOverlay(id: timer.id, wiring: wiring) { tappedBrick(timer.id) }
+                .contextMenu { deleteMenuItem(for: brick) }
         case .gate(let gate):
             GateBrickView(data: gate)
                 .wiringOverlay(id: gate.id, wiring: wiring) { tappedBrick(gate.id) }
+                .contextMenu { deleteMenuItem(for: brick) }
         case .supplemental(let sup):
             SupplementalBrickView(data: sup)
                 .wiringOverlay(id: sup.id, wiring: wiring) { tappedBrick(sup.id) }
+                .contextMenu { deleteMenuItem(for: brick) }
+        }
+    }
+
+    /// Right-click / long-press context menu item for deleting a
+    /// card. Replaces the row-level trash icon that the 2D-grid
+    /// refactor dropped (Michael caught this 2026-05-19).
+    @ViewBuilder
+    private func deleteMenuItem(for brick: CanvasBrick) -> some View {
+        Button(role: .destructive) {
+            deleteCanvasBrick(brick)
+        } label: {
+            Label("Delete card", systemImage: "trash")
+        }
+    }
+
+    /// Polymorphic delete across all brick families.
+    private func deleteCanvasBrick(_ brick: CanvasBrick) {
+        switch brick {
+        case .timer(let t):        modelContext.delete(t)
+        case .gate(let g):         modelContext.delete(g)
+        case .supplemental(let s): modelContext.delete(s)
         }
     }
 
