@@ -135,6 +135,46 @@
 //        compact rendering (bars + arrows, no controls) via
 //        SwiftUI ImageRenderer → PDF context.
 //
+//   M5.7 — Wire-UX overhaul + runtime semantics
+//        (Michael 2026-05-19 design conversation).
+//
+//        Tap-to-wire UX: tap Trace tile → "tap source" prompt
+//          → tap brick (highlights) → "tap destination" prompt
+//          → tap brick → wire drawn. Replaces the form-card
+//          trace design. Properties via popover when wire is
+//          tapped.
+//
+//        Row-barrier execution: rows are sequential phases;
+//          bricks within a row run in parallel; row completes
+//          when all its bricks finish; next row starts then.
+//
+//        Input-gating: bricks with incoming traces wait for
+//          their inputs (no row-barrier fallback). For non-gate
+//          bricks: implicit AND of all incoming traces. For
+//          logic-gate bricks: gate's built-in boolean (AND
+//          needs all, OR fires on any, NOR fires if none,
+//          etc.). No incoming traces → row-barrier default.
+//
+//        Heartbeat runtime: implicit 1 Hz tick from program
+//          start (Trigger fires) until program end. Drives
+//          gate settle evaluation for NOR/NAND/XNOR (which
+//          need an "all settled" moment). Reactive gates
+//          (AND/OR) can also tick-evaluate for consistency.
+//          Heartbeat is runtime infrastructure, not a brick.
+//
+//        End brick: new brick type that terminates the program.
+//
+//        Stop button: in chart toolbar. Pulsates at 1 Hz while
+//          program is running (each pulse = heartbeat tick).
+//          Pressed: turns red, stops pulsating ("the program
+//          had a heart attack and stopped"). Halts the program.
+//
+//        Program states: idle → running → ended-via-end-brick
+//          OR ended-via-stop. State transitions log.
+//
+//        Summary popup on end: auto-presented LogView with
+//          save (JSON/CSV export) and print (PDF) actions.
+//
 //   M6 — Alarm / notification. Silent / audible / system
 //        notification, user-selectable per timer, foreground +
 //        background.
