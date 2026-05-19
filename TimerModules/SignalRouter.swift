@@ -158,6 +158,90 @@ enum SignalRouter {
         )
 
         propagate(from: timer.id, in: chartId, runId: runId, in: context)
+
+        // Row-barrier default flow: if this completion makes the
+        // timer's row entirely done (no more running or unstarted
+        // timers in the row), auto-fire every brick in the next
+        // row (Michael 2026-05-19, M5.7).
+        advanceRowIfRowComplete(
+            chartId: chartId,
+            completedRow: timer.order,
+            runId: runId,
+            in: context
+        )
+    }
+
+    /// Checks whether every timer in the given row has completed.
+    /// If so, fires every brick in the next row (timers get
+    /// runningSince = now; supplementals run their side effects).
+    /// This is the row-barrier default-flow advance described in
+    /// the M5.7 design conversation.
+    private static func advanceRowIfRowComplete(
+        chartId: UUID,
+        completedRow: Int,
+        runId: UUID,
+        in context: ModelContext
+    ) {
+        let timersInRow = (try? context.fetch(
+            FetchDescriptor<TimerModuleData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.order == completedRow }
+            )
+        )) ?? []
+
+        // Row is complete if every timer in it has been started
+        // (accumulatedSeconds > 0) and is not currently running.
+        let allDone = timersInRow.allSatisfy { t in
+            t.runningSince == nil && t.accumulatedSeconds > 0
+        }
+        guard !timersInRow.isEmpty, allDone else { return }
+
+        let nextRow = completedRow + 1
+        let nextRowTimers = (try? context.fetch(
+            FetchDescriptor<TimerModuleData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.order == nextRow }
+            )
+        )) ?? []
+        let nextRowSups = (try? context.fetch(
+            FetchDescriptor<SupplementalBrickData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.order == nextRow }
+            )
+        )) ?? []
+
+        guard !nextRowTimers.isEmpty || !nextRowSups.isEmpty else {
+            // No next row — program runs out the bottom. Heartbeat
+            // keeps running until the user presses Stop or hits an
+            // End brick (already handled).
+            return
+        }
+
+        log(
+            eventType: "rowAdvanced",
+            brickId: nil,
+            brickTypeRaw: "",
+            brickNotation: "row \(completedRow) → row \(nextRow)",
+            ganttChartId: chartId,
+            runId: runId,
+            in: context
+        )
+
+        for t in nextRowTimers {
+            t.runningSince = Date()
+            t.updatedDate = Date()
+            log(
+                eventType: "timerStarted",
+                brickId: t.id,
+                brickTypeRaw: BrickType.timerModule.rawValue,
+                brickNotation: t.notation,
+                ganttChartId: chartId,
+                runId: runId,
+                in: context
+            )
+            propagate(from: t.id, in: chartId, runId: runId, in: context)
+        }
+        for s in nextRowSups {
+            handleSupplementalSignal(s, runId: runId, in: context)
+            propagate(from: s.id, in: chartId, runId: runId, in: context)
+        }
     }
 
     // MARK: Propagation
