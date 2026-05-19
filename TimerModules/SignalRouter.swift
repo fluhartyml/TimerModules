@@ -33,6 +33,25 @@ enum SignalRouter {
         runners[chartId]?.currentRunId ?? UUID()
     }
 
+    /// Per-chart per-gate tally of which incoming traces have fired
+    /// during the active run. Used by gate evaluation: AND fires
+    /// when all incoming traces have fired; OR fires as soon as
+    /// any one does. Reset each time a new run starts.
+    private static var firedInputs: [UUID: [UUID: Set<UUID>]] = [:]
+    // shape: [chartId: [gateId: Set<traceId>]]
+
+    private static func resetFiredInputs(chartId: UUID) {
+        firedInputs[chartId] = [:]
+    }
+
+    private static func recordInput(traceId: UUID, atGate gateId: UUID, chartId: UUID) {
+        firedInputs[chartId, default: [:]][gateId, default: []].insert(traceId)
+    }
+
+    private static func firedInputCount(forGate gateId: UUID, chartId: UUID) -> Int {
+        firedInputs[chartId]?[gateId]?.count ?? 0
+    }
+
     /// Called when a Trigger brick's Start button is pressed.
     /// Starts a new program run on the trigger's chart and
     /// propagates signal from the trigger to its downstream
@@ -48,6 +67,7 @@ enum SignalRouter {
         // the trigger-level event below records WHICH brick
         // initiated the run.
         let runId = runners[chartId]?.start(in: context) ?? UUID()
+        resetFiredInputs(chartId: chartId)
 
         log(
             eventType: "triggerFired",
@@ -103,6 +123,7 @@ enum SignalRouter {
     static func startProgram(chartId: UUID, in context: ModelContext) {
         guard let runner = runners[chartId] else { return }
         let runId = runner.start(in: context)
+        resetFiredInputs(chartId: chartId)
 
         let row0Timers = (try? context.fetch(
             FetchDescriptor<TimerModuleData>(
@@ -271,12 +292,13 @@ enum SignalRouter {
             )
 
             for destId in trace.destinationBrickIds {
-                deliver(signal: destId, via: trace, in: chartId, runId: runId, in: context)
+                deliver(traceId: trace.id, signal: destId, via: trace, in: chartId, runId: runId, in: context)
             }
         }
     }
 
     private static func deliver(
+        traceId: UUID,
         signal destId: UUID,
         via trace: TraceData,
         in chartId: UUID,
@@ -290,6 +312,7 @@ enum SignalRouter {
             return
         }
         if let gate = fetchOne(GateBrickData.self, id: destId, chartId: chartId, in: context) {
+            recordInput(traceId: traceId, atGate: gate.id, chartId: chartId)
             log(
                 eventType: "gateInputReceived",
                 brickId: gate.id,
@@ -299,13 +322,65 @@ enum SignalRouter {
                 runId: runId,
                 in: context
             )
-            // Full gate evaluation lands in subsequent polish.
+            evaluateAndPropagate(gate: gate, chartId: chartId, runId: runId, in: context)
             return
         }
         if let sup = fetchOne(SupplementalBrickData.self, id: destId, chartId: chartId, in: context) {
             handleSupplementalSignal(sup, runId: runId, in: context)
             return
         }
+    }
+
+    /// Evaluate a gate's boolean against its current fired-input
+    /// state. If the gate evaluates true, log gateFired and
+    /// propagate from the gate's id to outgoing traces.
+    ///
+    /// Reactive gates (AND, OR, NOT) settle immediately on input
+    /// arrival. "Settle gates" (NOR, NAND, XNOR, XOR) need the
+    /// heartbeat-driven settle moment to fire correctly without
+    /// firing prematurely — they're handled but may fire on the
+    /// first input arrival if their condition is already true
+    /// (acceptable for v1; full settle timing is a polish pass).
+    private static func evaluateAndPropagate(
+        gate: GateBrickData,
+        chartId: UUID,
+        runId: UUID,
+        in context: ModelContext
+    ) {
+        // SwiftData's #Predicate macro doesn't support array.contains
+        // with a captured value on the right side, so fetch all
+        // chart traces and filter in Swift.
+        let chartTraces = (try? context.fetch(
+            FetchDescriptor<TraceData>(
+                predicate: #Predicate { $0.ganttChartId == chartId }
+            )
+        )) ?? []
+        let gateId = gate.id
+        let allIncoming = chartTraces.filter { $0.destinationBrickIds.contains(gateId) }
+
+        let firedSet = firedInputs[chartId]?[gate.id] ?? []
+        let inputs: [Bool] = allIncoming.map { firedSet.contains($0.id) }
+
+        let didFire = gate.evaluate(inputs: inputs)
+        guard didFire else { return }
+
+        // Guard against double-firing the same gate within one run.
+        let firedGatesKey = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let gateFiredOnce = firedInputs[chartId]?[firedGatesKey]?.contains(gate.id) ?? false
+        guard !gateFiredOnce else { return }
+        firedInputs[chartId, default: [:]][firedGatesKey, default: []].insert(gate.id)
+
+        log(
+            eventType: "gateFired",
+            brickId: gate.id,
+            brickTypeRaw: gate.gateTypeRaw,
+            brickNotation: gate.notation,
+            ganttChartId: chartId,
+            payloadJSON: "{\"inputs\":\(inputs),\"output\":true}",
+            runId: runId,
+            in: context
+        )
+        propagate(from: gate.id, in: chartId, runId: runId, in: context)
     }
 
     private static func handleTimerSignal(
