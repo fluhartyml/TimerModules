@@ -15,9 +15,23 @@ import Foundation
 import SwiftData
 
 enum SignalRouter {
-    /// In-memory map of chart id → active run id. One concurrent
-    /// run per chart in v1.0.
-    private static var activeRuns: [UUID: UUID] = [:]
+    /// In-memory map of chart id → ProgramRunner. Each chart that
+    /// is currently open registers its runner here so router calls
+    /// can look up the heartbeat / run-state for the source chart.
+    /// M5.7 (Michael 2026-05-19).
+    private static var runners: [UUID: ProgramRunner] = [:]
+
+    static func register(_ runner: ProgramRunner) {
+        runners[runner.chartId] = runner
+    }
+
+    static func unregister(chartId: UUID) {
+        runners[chartId] = nil
+    }
+
+    private static func currentRunId(for chartId: UUID) -> UUID {
+        runners[chartId]?.currentRunId ?? UUID()
+    }
 
     /// Called when a Trigger brick's Start button is pressed.
     /// Starts a new program run on the trigger's chart and
@@ -29,11 +43,14 @@ enum SignalRouter {
     ) {
         guard let chartId = trigger.ganttChartId else { return }
 
-        let runId = UUID()
-        activeRuns[chartId] = runId
+        // Kick the heartbeat — the runner logs its own
+        // programStarted entry. We avoid duplicating that here;
+        // the trigger-level event below records WHICH brick
+        // initiated the run.
+        let runId = runners[chartId]?.start(in: context) ?? UUID()
 
         log(
-            eventType: "programStarted",
+            eventType: "triggerFired",
             brickId: trigger.id,
             brickTypeRaw: trigger.brickTypeRaw,
             brickNotation: triggerLabel(trigger),
@@ -53,7 +70,7 @@ enum SignalRouter {
         in context: ModelContext
     ) {
         guard let chartId = timer.ganttChartId else { return }
-        let runId = activeRuns[chartId] ?? UUID()
+        let runId = currentRunId(for: chartId)
 
         log(
             eventType: "timerCompleted",

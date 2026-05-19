@@ -26,6 +26,13 @@ struct GanttChartContainerView: View {
     /// flow. M5.7 (Michael 2026-05-19).
     @State private var wiring = WiringState()
 
+    /// Per-chart heartbeat runtime. Owns the program's lifecycle
+    /// state and the 1 Hz heartbeat timer. Initialized lazily via
+    /// .task on first appearance so chartId is available.
+    @State private var runner: ProgramRunner?
+
+    @Environment(\.modelContext) private var modelContext
+
     var body: some View {
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
@@ -71,6 +78,12 @@ struct GanttChartContainerView: View {
 
             ToolbarItemGroup(placement: .primaryAction) {
                 columnStepper
+                if let runner = runner {
+                    StopButtonView(runner: runner) {
+                        runner.stopByUser(in: modelContext)
+                        showingLog = true
+                    }
+                }
                 Button {
                     showingLog = true
                 } label: {
@@ -94,6 +107,14 @@ struct GanttChartContainerView: View {
         }
         .onAppear {
             chart.lastOpenedDate = Date()
+            if runner == nil {
+                let newRunner = ProgramRunner(chartId: chart.id)
+                runner = newRunner
+                SignalRouter.register(newRunner)
+            }
+        }
+        .onDisappear {
+            SignalRouter.unregister(chartId: chart.id)
         }
     }
 
