@@ -147,6 +147,11 @@
 // ============================================================
 //
 //   • Universal target (iOS + iPadOS + macOS), single source tree.
+//   • Deployment target floor: iOS / macOS / visionOS 26.4.
+//     Reasoning (Michael 2026-05-19): iOS 26 supports iPhone 11
+//     Pro and newer; iOS 27 drops iPhone 11 Pro (per MacRumors).
+//     Shipping at iOS 26.4 maximizes device reach within Apple's
+//     current support window.
 //   • 18pt minimum font height (iPad readability standard).
 //   • No tinted icons — light + dark only.
 //   • One concern at a time; no extra abstractions / managers /
