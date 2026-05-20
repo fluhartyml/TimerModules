@@ -17,72 +17,69 @@ struct GateBrickView: View {
     private var gateType: BrickType { data.gateType }
 
     var body: some View {
-        VStack(alignment: .center, spacing: 16) {
+        VStack(alignment: .center, spacing: 6) {
             notationField
             glyphFace
             gateNameLabel
         }
-        .padding(20)
-        .frame(maxWidth: 280)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .padding(8)
+        .frame(width: 100)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.orange.opacity(0.35), lineWidth: 1)
         )
     }
 
     // MARK: Notation field (editable, same pattern as Timer brick)
+    //
+    // Compact layout: pencil icon dropped to save horizontal room;
+    // the TextField itself reads as the label. The 18pt font is the
+    // iPad-readability floor (`feedback_18pt_minimum_font`) but the
+    // field allows truncation so a long label collapses with "…"
+    // rather than pushing the card wider.
 
     private var notationField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "pencil.line")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-            TextField("Label this gate", text: $data.notation)
-                .font(.system(size: 18, weight: .semibold))
-                .textFieldStyle(.plain)
-                .submitLabel(.done)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.thinMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.orange.opacity(0.25), lineWidth: 1)
-        )
+        TextField("Label", text: $data.notation)
+            .font(.system(size: 13, weight: .semibold))
+            .multilineTextAlignment(.center)
+            .textFieldStyle(.plain)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(.thinMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.orange.opacity(0.25), lineWidth: 1)
+            )
     }
 
-    // MARK: Large operator glyph
+    // MARK: Operator glyph (shrunk to fit the compact card footprint)
 
     private var glyphFace: some View {
         ZStack {
             Circle()
                 .fill(Color.orange.opacity(0.08))
             Circle()
-                .stroke(Color.orange.opacity(0.6), lineWidth: 2)
+                .stroke(Color.orange.opacity(0.6), lineWidth: 1.5)
 
             Text(gateType.textGlyph ?? "?")
-                .font(.system(size: 72, weight: .semibold, design: .serif))
+                .font(.system(size: 30, weight: .semibold, design: .serif))
                 .foregroundStyle(Color.orange)
         }
-        .frame(width: 140, height: 140)
+        .frame(width: 56, height: 56)
     }
 
-    // MARK: Gate name + family label
+    // MARK: Gate name (family subtitle dropped in compact layout)
 
     private var gateNameLabel: some View {
-        VStack(spacing: 2) {
-            Text(gateType.displayName)
-                .font(.title3)
-                .fontWeight(.bold)
-            Text("Logic gate")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-        }
+        Text(gateType.displayName)
+            .font(.system(size: 13, weight: .bold))
+            .lineLimit(1)
     }
 }
 
