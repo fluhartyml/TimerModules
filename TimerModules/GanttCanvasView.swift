@@ -597,14 +597,19 @@ struct GanttCanvasView: View {
         }
     }
 
-    /// 24-stop hue rotation starting at red. Saturation and
-    /// brightness fixed so every color reads clearly against the
-    /// dark canvas (Michael 2026-05-20).
-    private static let colorWheelSteps: Int = 24
+    /// Golden-angle hue rotation — each consecutive trace lands far
+    /// across the color wheel from the previous one so adjacent
+    /// traces never read as the same color family (Michael 2026-05-20:
+    /// "the colors from the color wheel could be opposites chosen so
+    /// they dont look to similar"). The first trace is red at hue 0;
+    /// subsequent traces step by the golden angle (137.508°)
+    /// normalized to a 0...1 fraction, producing a distribution that
+    /// maximizes color separation for any number of traces.
+    private static let goldenAngleHueStep: Double = 0.38196601125010515
 
     private static func colorWheelColor(for index: Int) -> Color {
-        let step = Double(index % colorWheelSteps) / Double(colorWheelSteps)
-        return Color(hue: step, saturation: 0.85, brightness: 0.95)
+        let hue = (Double(index) * goldenAngleHueStep).truncatingRemainder(dividingBy: 1.0)
+        return Color(hue: hue, saturation: 0.85, brightness: 0.95)
     }
 
     private func anchorPoint(of frame: CGRect, side: TraceAnchor) -> CGPoint {
