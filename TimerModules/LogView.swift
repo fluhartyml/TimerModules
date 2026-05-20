@@ -12,6 +12,7 @@ struct LogView: View {
     let chartName: String
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismissWindow) private var dismissWindow
     @Query private var entries: [LogEntry]
 
     init(chartId: UUID, chartName: String) {
@@ -26,23 +27,72 @@ struct LogView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if entries.isEmpty {
-                    emptyState
-                } else {
-                    entryList
+            VStack(spacing: 0) {
+                // Always-visible header with title + explicit Close
+                // button. Belt-and-suspenders with the toolbar Done
+                // — guarantees the user always has a dismiss
+                // affordance regardless of platform (Michael
+                // 2026-05-19 sheet-presentation bug).
+                explicitHeader
+
+                Group {
+                    if entries.isEmpty {
+                        emptyState
+                    } else {
+                        entryList
+                    }
                 }
             }
-            .navigationTitle("\(chartName) — Log")
+            .navigationTitle("")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Done") { dismiss() }
                 }
             }
+            #endif
         }
+        .frame(minWidth: 480, minHeight: 360)
+    }
+
+    /// Header rendered inside the view body — works on iOS sheet
+    /// and Mac window (where toolbar treatment differs / hides).
+    private var explicitHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(chartName)
+                    .font(.headline)
+                Text("Execution log")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                closeView()
+            } label: {
+                Label("Close", systemImage: "xmark.circle.fill")
+                    .labelStyle(.iconOnly)
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Close the log")
+            .keyboardShortcut(.cancelAction)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 14)
+        .padding(.bottom, 10)
+        .background(.bar)
+    }
+
+    /// Close handler — works for both presentation paths.
+    /// .dismiss handles the sheet case (iOS); dismissWindow
+    /// handles the WindowGroup case (Mac). Calling both is safe;
+    /// each only acts in its applicable presentation context.
+    private func closeView() {
+        dismiss()
+        dismissWindow(id: "logWindow")
     }
 
     private var emptyState: some View {

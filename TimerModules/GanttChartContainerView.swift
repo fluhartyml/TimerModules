@@ -38,6 +38,7 @@ struct GanttChartContainerView: View {
     @State private var runner: ProgramRunner?
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -97,7 +98,7 @@ struct GanttChartContainerView: View {
                             // caught this bug 2026-05-19).
                             SignalRouter.stopAllRunningTimers(chartId: chart.id, in: modelContext)
                             runner.stopByUser(in: modelContext)
-                            showingLog = true
+                            presentLog()
                         },
                         onReset: {
                             runner.reset()
@@ -105,7 +106,7 @@ struct GanttChartContainerView: View {
                     )
                 }
                 Button {
-                    showingLog = true
+                    presentLog()
                 } label: {
                     Label("Log", systemImage: "list.bullet.rectangle")
                 }
@@ -134,10 +135,12 @@ struct GanttChartContainerView: View {
             }
         }
         // When an End brick ends the program, auto-present the
-        // summary popup (currently just the LogView).
+        // summary popup. Platform-conditional — on Mac the log
+        // opens as a real Window with traffic lights / drag-to-
+        // move; on iOS it opens as a sheet.
         .onChange(of: runner?.state) { _, newState in
             if case .endedViaEndBrick = newState {
-                showingLog = true
+                presentLog()
             }
         }
         .onDisappear {
@@ -209,6 +212,21 @@ struct GanttChartContainerView: View {
         } message: {
             Text("This column contains \(columnRemoveTarget.cardCount) card\(columnRemoveTarget.cardCount == 1 ? "" : "s"). Removing the column will delete \(columnRemoveTarget.cardCount == 1 ? "it" : "them"). This can't be undone.")
         }
+    }
+
+    /// Open the chart's execution log. On Mac we open a real
+    /// Window (full chrome — traffic lights, drag-to-move,
+    /// close button). On iOS we present a sheet with an
+    /// always-visible Close button in its header.
+    private func presentLog() {
+        #if os(macOS)
+        openWindow(
+            id: "logWindow",
+            value: LogWindowID(chartId: chart.id, chartName: chart.name)
+        )
+        #else
+        showingLog = true
+        #endif
     }
 
     private func increaseColumns() {
