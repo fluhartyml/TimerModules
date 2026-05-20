@@ -30,7 +30,11 @@ struct GateBrickView: View {
         )
     }
 
-    // MARK: Operator glyph (shrunk to fit the compact card footprint)
+    // MARK: Distinctive-shape gate glyph (IEEE 91)
+    //
+    // Replaces the Unicode operator character with a SwiftUI Shape
+    // that draws the actual schematic gate hieroglyph — D-shape
+    // AND, curved OR, triangle NOT, etc. (Michael 2026-05-20).
 
     private var glyphFace: some View {
         ZStack {
@@ -39,9 +43,9 @@ struct GateBrickView: View {
             Circle()
                 .stroke(Color.orange.opacity(0.6), lineWidth: 1.5)
 
-            Text(gateType.textGlyph ?? "?")
-                .font(.system(size: 30, weight: .semibold, design: .serif))
-                .foregroundStyle(Color.orange)
+            GateGlyphShape(gateType: gateType)
+                .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineJoin: .round))
+                .frame(width: 42, height: 25)
         }
         .frame(width: 56, height: 56)
     }
