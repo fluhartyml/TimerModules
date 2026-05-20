@@ -24,8 +24,13 @@ struct TimerModuleBrickView: View {
     @State private var tick: Date = Date()
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    @State private var sweepAngle: Double = 0
     @State private var lastFiredAtElapsed: TimeInterval = -1
+
+    /// Measured height of the three-line status text block. Drives the
+    /// status circle's diameter so the circle stays sized to its
+    /// neighbor (Michael 2026-05-20: "diameter of the timer 00:00
+    /// complete and trigger at 1 min").
+    @State private var statusTextHeight: CGFloat = 60
 
     // MARK: Computed state
 
@@ -87,10 +92,10 @@ struct TimerModuleBrickView: View {
     // MARK: Body
 
     var body: some View {
-        VStack(alignment: .center, spacing: 18) {
+        VStack(alignment: .center, spacing: 14) {
             notationField
             modeAndDurationControls
-            analogDial
+            compactStatus
             // Reserve a fixed height for the start/stop button row
             // so the brick's overall frame doesn't shift between
             // idle / running / paused states (Michael caught the
@@ -98,8 +103,8 @@ struct TimerModuleBrickView: View {
             startStopReset
                 .frame(height: 44)
         }
-        .padding(20)
-        .frame(width: 320, height: 500, alignment: .top)
+        .padding(16)
+        .frame(width: 320, alignment: .top)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
         .onReceive(ticker) { now in
             if isRunning {
@@ -180,33 +185,27 @@ struct TimerModuleBrickView: View {
         }
     }
 
-    // MARK: Analog dial (lifted from HOS TimerSectionView lines 95-130)
+    // MARK: Compact status (replaces the HOS dial, Michael 2026-05-20)
+    //
+    // A small "status circle" to the LEFT of the time/status text
+    // block. The circle's diameter is matched to the block's measured
+    // height so the two read as visually paired. The text block keeps
+    // its three lines (time, status word, trigger duration) but the
+    // time numerals drop from 44pt to 18pt — the rest of the card no
+    // longer has to defer to a 220pt dial.
 
-    private var analogDial: some View {
-        ZStack {
+    private var compactStatus: some View {
+        HStack(alignment: .center, spacing: 14) {
             Circle()
                 .stroke(
-                    Color.secondary.opacity(0.25),
-                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                    isRunning ? Color.accentColor : Color.secondary.opacity(0.4),
+                    lineWidth: 3
                 )
+                .frame(width: statusTextHeight, height: statusTextHeight)
 
-            Circle()
-                .trim(from: 0, to: 0.18)
-                .stroke(
-                    isRunning ? Color.accentColor : Color.secondary.opacity(0.35),
-                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                )
-                .rotationEffect(.degrees(sweepAngle - 90))
-                .animation(
-                    isRunning
-                        ? .linear(duration: 2.5).repeatForever(autoreverses: false)
-                        : .default,
-                    value: sweepAngle
-                )
-
-            VStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(formattedTime)
-                    .font(.system(size: 44, weight: .semibold, design: .monospaced))
+                    .font(.system(size: 18, weight: .semibold, design: .monospaced))
                     .foregroundStyle(isRunning ? Color.accentColor : .primary)
                     .contentTransition(.numericText())
 
@@ -222,13 +221,20 @@ struct TimerModuleBrickView: View {
                         .monospacedDigit()
                 }
             }
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(
+                            key: StatusTextHeightKey.self,
+                            value: proxy.size.height
+                        )
+                }
+            )
+
+            Spacer(minLength: 0)
         }
-        .frame(width: 220, height: 220)
-        .onAppear {
-            if isRunning { sweepAngle = 360 }
-        }
-        .onChange(of: isRunning) { _, nowRunning in
-            sweepAngle = nowRunning ? 360 : 0
+        .onPreferenceChange(StatusTextHeightKey.self) { newHeight in
+            if newHeight > 0 { statusTextHeight = newHeight }
         }
     }
 
@@ -327,6 +333,16 @@ struct TimerModuleBrickView: View {
             elapsed: elapsedAtComplete,
             in: modelContext
         )
+    }
+}
+
+/// PreferenceKey that propagates the measured height of the status
+/// text block up to the parent HStack so the status circle can match
+/// it (Michael 2026-05-20).
+private struct StatusTextHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
