@@ -617,7 +617,12 @@ struct GanttCanvasView: View {
         // crosses to the destination's column, and approaches the
         // destination from the left with another horizontal stub. The
         // wire never enters any card body.
-        let stubGap: CGFloat = 10
+        // Stub width must stay smaller than the inter-card spacing
+        // (HStack spacing: 10 on the row) so the vertical drop lands
+        // INSIDE the gap between cards rather than ON the next card's
+        // edge. Michael 2026-05-20 — "traces can overlap each other,
+        // they just shouldnt go over a module."
+        let stubGap: CGFloat = 4
         let laneGap: CGFloat = 18
         let lane = max(srcFrame.maxY, destFrame.maxY) + laneGap
 
