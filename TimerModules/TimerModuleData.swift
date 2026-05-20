@@ -24,6 +24,12 @@ final class TimerModuleData {
     /// Required UX element per roadmap Section 1.5.1.
     var notation: String
 
+    /// User's free-form note about this module (Michael 2026-05-20).
+    /// Edited via the note.text glyph button in the card's top-right
+    /// corner or the long-press / right-click context menu. Empty
+    /// string when no note has been written.
+    var note: String = ""
+
     /// Countdown vs. count-up. Both modes ship in v1.0
     /// (roadmap Section 3.2).
     var mode: TimerMode

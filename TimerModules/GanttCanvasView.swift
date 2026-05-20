@@ -43,6 +43,21 @@ struct GanttCanvasView: View {
     @State private var dropTargetedRow: Int? = nil
     @State private var dropTargetedNewRow: Bool = false
 
+    /// Currently-open note editor target, if any (Michael 2026-05-20).
+    /// Set when the user taps a module's note.text glyph button or
+    /// chooses "Edit note…" from its long-press / right-click menu.
+    @State private var noteEditorTarget: NoteEditorTarget? = nil
+
+    /// Identifiable wrapper around an open note-editor session so a
+    /// single `.sheet(item:)` modifier on the canvas can present the
+    /// editor for any brick type.
+    private struct NoteEditorTarget: Identifiable {
+        let id: UUID
+        let title: String
+        let initialNote: String
+        let onSave: (String) -> Void
+    }
+
     init(chartId: UUID, columnCount: Int, wiring: WiringState) {
         self.chartId = chartId
         self.columnCount = columnCount
@@ -160,6 +175,13 @@ struct GanttCanvasView: View {
                     }
                 }
             }
+            .sheet(item: $noteEditorTarget) { target in
+                NoteEditorSheet(
+                    title: target.title,
+                    initialNote: target.initialNote,
+                    onSave: target.onSave
+                )
+            }
         }
     }
 
@@ -257,18 +279,125 @@ struct GanttCanvasView: View {
     private func brickContent(for brick: CanvasBrick) -> some View {
         switch brick {
         case .timer(let timer):
-            TimerModuleBrickView(data: timer)
-                .wiringOverlay(id: timer.id, wiring: wiring) { tappedBrick(timer.id) }
-                .contextMenu { deleteMenuItem(for: brick) }
+            TimerModuleBrickView(
+                data: timer,
+                onEditNoteTapped: { openNoteEditorForTimer(timer) }
+            )
+            .wiringOverlay(id: timer.id, wiring: wiring) { tappedBrick(timer.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForTimer(timer) }
+                deleteMenuItem(for: brick)
+            }
         case .gate(let gate):
-            GateBrickView(data: gate)
-                .wiringOverlay(id: gate.id, wiring: wiring) { tappedBrick(gate.id) }
-                .contextMenu { deleteMenuItem(for: brick) }
+            GateBrickView(
+                data: gate,
+                onEditNoteTapped: { openNoteEditorForGate(gate) }
+            )
+            .wiringOverlay(id: gate.id, wiring: wiring) { tappedBrick(gate.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForGate(gate) }
+                deleteMenuItem(for: brick)
+            }
         case .supplemental(let sup):
-            SupplementalBrickView(data: sup)
-                .wiringOverlay(id: sup.id, wiring: wiring) { tappedBrick(sup.id) }
-                .contextMenu { deleteMenuItem(for: brick) }
+            SupplementalBrickView(
+                data: sup,
+                onEditNoteTapped: { openNoteEditorForSupplemental(sup) }
+            )
+            .wiringOverlay(id: sup.id, wiring: wiring) { tappedBrick(sup.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForSupplemental(sup) }
+                deleteMenuItem(for: brick)
+            }
         }
+    }
+
+    // MARK: Note editor wiring (Michael 2026-05-20)
+
+    /// "Edit note…" menu item used in every brick's context menu.
+    /// Companion to the always-visible note.text glyph button.
+    @ViewBuilder
+    private func editNoteMenuItem(open: @escaping () -> Void) -> some View {
+        Button {
+            open()
+        } label: {
+            Label("Edit note…", systemImage: "note.text")
+        }
+    }
+
+    private func openNoteEditorForTimer(_ timer: TimerModuleData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: timer.id,
+            title: timer.notation.isEmpty ? "Timer" : timer.notation,
+            initialNote: timer.note,
+            onSave: { newNote in
+                timer.note = newNote
+                timer.updatedDate = Date()
+                logNoteSaved(
+                    brickId: timer.id,
+                    brickTypeRaw: BrickType.timerModule.rawValue,
+                    brickNotation: timer.notation,
+                    note: newNote
+                )
+            }
+        )
+    }
+
+    private func openNoteEditorForGate(_ gate: GateBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: gate.id,
+            title: gate.gateType.displayName,
+            initialNote: gate.note,
+            onSave: { newNote in
+                gate.note = newNote
+                gate.updatedDate = Date()
+                logNoteSaved(
+                    brickId: gate.id,
+                    brickTypeRaw: gate.gateType.rawValue,
+                    brickNotation: gate.notation,
+                    note: newNote
+                )
+            }
+        )
+    }
+
+    private func openNoteEditorForSupplemental(_ sup: SupplementalBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: sup.id,
+            title: sup.notation.isEmpty ? sup.brickType.displayName : sup.notation,
+            initialNote: sup.note,
+            onSave: { newNote in
+                sup.note = newNote
+                sup.updatedDate = Date()
+                logNoteSaved(
+                    brickId: sup.id,
+                    brickTypeRaw: sup.brickType.rawValue,
+                    brickNotation: sup.notation,
+                    note: newNote
+                )
+            }
+        )
+    }
+
+    /// Writes a LogEntry recording the saved note so it appears in
+    /// the LogView alongside runtime events. Each note save creates
+    /// its own runId (notes aren't part of any program run).
+    private func logNoteSaved(
+        brickId: UUID,
+        brickTypeRaw: String,
+        brickNotation: String,
+        note: String
+    ) {
+        let entry = LogEntry(
+            ganttChartId: chartId,
+            brickId: brickId,
+            brickTypeRaw: brickTypeRaw,
+            brickNotation: brickNotation,
+            eventType: "noteSaved",
+            payloadJSON: note,
+            timestamp: Date(),
+            runId: UUID()
+        )
+        modelContext.insert(entry)
     }
 
     /// Right-click / long-press context menu items for a card.

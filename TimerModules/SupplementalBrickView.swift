@@ -14,6 +14,10 @@ struct SupplementalBrickView: View {
     @Bindable var data: SupplementalBrickData
     @Environment(\.modelContext) private var modelContext
 
+    /// Invoked when the user taps the note.text glyph (Michael
+    /// 2026-05-20). Parent (GanttCanvasView) owns the editor sheet.
+    var onEditNoteTapped: () -> Void = {}
+
     private var brickType: BrickType { data.brickType }
 
     var body: some View {
@@ -37,6 +41,9 @@ struct SupplementalBrickView: View {
                 RoundedRectangle(cornerRadius: 18)
                     .stroke(brickColor.opacity(0.4), lineWidth: 1)
             )
+            .overlay(alignment: .topTrailing) {
+                noteGlyphButton.padding(6)
+            }
         }
     }
 
@@ -58,6 +65,35 @@ struct SupplementalBrickView: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.red.opacity(0.4), lineWidth: 1)
         )
+        .overlay(alignment: .topTrailing) {
+            noteGlyphButton.padding(2)
+        }
+    }
+
+    // MARK: Note glyph button (Michael 2026-05-20)
+    //
+    // Always visible. Subtle grey when no note exists; saturated
+    // cyan when the module has notes. Tap → opens the note editor.
+
+    private var noteGlyphButton: some View {
+        Button {
+            onEditNoteTapped()
+        } label: {
+            Image(systemName: "note.text")
+                .font(.system(size: brickType == .endBrick ? 11 : 14, weight: .semibold))
+                .foregroundStyle(
+                    data.note.isEmpty
+                        ? AnyShapeStyle(Color.secondary.opacity(0.35))
+                        : AnyShapeStyle(Color.cyan)
+                )
+                .frame(
+                    width: brickType == .endBrick ? 22 : 28,
+                    height: brickType == .endBrick ? 22 : 28
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(data.note.isEmpty ? "Add note" : "Edit note")
     }
 
     // MARK: Header

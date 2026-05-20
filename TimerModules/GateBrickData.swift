@@ -36,6 +36,11 @@ final class GateBrickData {
     /// Optional user notation — gate brick can be labeled like timers.
     var notation: String
 
+    /// User's free-form note about this gate (Michael 2026-05-20).
+    /// Edited via the note.text glyph button in the card's top-right
+    /// corner or the long-press / right-click context menu.
+    var note: String = ""
+
     /// Bookkeeping.
     var createdDate: Date
     var updatedDate: Date

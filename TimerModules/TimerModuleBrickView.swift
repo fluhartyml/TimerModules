@@ -21,6 +21,12 @@ struct TimerModuleBrickView: View {
     @Bindable var data: TimerModuleData
     @Environment(\.modelContext) private var modelContext
 
+    /// Invoked when the user taps the note.text glyph in the top-right
+    /// corner (Michael 2026-05-20). The parent (GanttCanvasView) owns
+    /// the editor sheet so the same handler fires from both the glyph
+    /// button and the long-press / right-click context menu.
+    var onEditNoteTapped: () -> Void = {}
+
     @State private var tick: Date = Date()
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -106,6 +112,9 @@ struct TimerModuleBrickView: View {
         .padding(16)
         .frame(width: 320, alignment: .top)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(alignment: .topTrailing) {
+            noteGlyphButton.padding(6)
+        }
         .onReceive(ticker) { now in
             if isRunning {
                 tick = now
@@ -117,6 +126,30 @@ struct TimerModuleBrickView: View {
                 }
             }
         }
+    }
+
+    // MARK: Note glyph button (top-right corner)
+    //
+    // Always visible. Subtle grey when no note exists; saturated
+    // cyan when the module has notes. Tap → opens the note editor.
+    // (Michael 2026-05-20.)
+
+    private var noteGlyphButton: some View {
+        Button {
+            onEditNoteTapped()
+        } label: {
+            Image(systemName: "note.text")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(
+                    data.note.isEmpty
+                        ? AnyShapeStyle(Color.secondary.opacity(0.35))
+                        : AnyShapeStyle(Color.cyan)
+                )
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(data.note.isEmpty ? "Add note" : "Edit note")
     }
 
     // MARK: Notation field (the prominent user-label on the brick face)

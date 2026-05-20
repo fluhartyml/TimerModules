@@ -32,6 +32,11 @@ final class SupplementalBrickData {
     /// User-editable label across all supplemental types.
     var notation: String
 
+    /// User's free-form note about this module (Michael 2026-05-20).
+    /// Edited via the note.text glyph button in the card's top-right
+    /// corner or the long-press / right-click context menu.
+    var note: String = ""
+
     var createdDate: Date
     var updatedDate: Date
 

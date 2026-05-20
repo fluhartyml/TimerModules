@@ -14,6 +14,12 @@ import SwiftData
 struct GateBrickView: View {
     @Bindable var data: GateBrickData
 
+    /// Invoked when the user taps the note.text glyph in the top-right
+    /// corner (Michael 2026-05-20). The parent (GanttCanvasView) owns
+    /// the editor sheet so the same handler fires from both the glyph
+    /// button and the long-press / right-click context menu.
+    var onEditNoteTapped: () -> Void = {}
+
     private var gateType: BrickType { data.gateType }
 
     var body: some View {
@@ -28,6 +34,29 @@ struct GateBrickView: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.orange.opacity(0.35), lineWidth: 1)
         )
+        .overlay(alignment: .topTrailing) {
+            noteGlyphButton.padding(2)
+        }
+    }
+
+    // MARK: Note glyph button — smaller for the compact gate card
+
+    private var noteGlyphButton: some View {
+        Button {
+            onEditNoteTapped()
+        } label: {
+            Image(systemName: "note.text")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(
+                    data.note.isEmpty
+                        ? AnyShapeStyle(Color.secondary.opacity(0.35))
+                        : AnyShapeStyle(Color.cyan)
+                )
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(data.note.isEmpty ? "Add note" : "Edit note")
     }
 
     // MARK: Distinctive-shape gate glyph (IEEE 91)
