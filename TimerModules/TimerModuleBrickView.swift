@@ -84,6 +84,20 @@ struct TimerModuleBrickView: View {
         data.runningSince != nil
     }
 
+    /// Shared binding the "Trigger at" TextField and Stepper both
+    /// read/write so typing a number and tapping +/- stay in sync.
+    /// Clamped to 1...240 minutes — the legacy stepper range.
+    private var triggerMinutesBinding: Binding<Int> {
+        Binding(
+            get: { Int(data.durationSeconds / 60) },
+            set: { newValue in
+                let clamped = max(1, min(240, newValue))
+                data.durationSeconds = TimeInterval(clamped) * 60
+                data.updatedDate = Date()
+            }
+        )
+    }
+
     private var isComplete: Bool {
         data.mode == .countdown && remaining <= 0 && data.accumulatedSeconds > 0
     }
@@ -187,25 +201,36 @@ struct TimerModuleBrickView: View {
             .pickerStyle(.segmented)
             .disabled(isRunning)
 
-            // "Trigger at" stepper — sets the elapsed/remaining seconds
-            // when a COUNTDOWN timer fires its completion signal. Hidden
-            // for count-up because count-up is open-ended; the user
-            // presses Complete manually when done (Michael 2026-05-19).
+            // "Trigger at" — sets the elapsed/remaining seconds when a
+            // COUNTDOWN timer fires its completion signal. Tap the
+            // number to type a value directly (number pad on iPhone /
+            // iPad, regular keyboard on Mac); +/- for fine ±1 min
+            // adjustments (Michael 2026-05-20: "+ and - to set the
+            // time in the timer takes too long").
+            // Hidden for count-up because count-up is open-ended; the
+            // user presses Complete manually when done (Michael
+            // 2026-05-19).
             if data.mode == .countdown {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     Text("Trigger at")
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Stepper(
-                        value: Binding(
-                            get: { Int(data.durationSeconds / 60) },
-                            set: { data.durationSeconds = TimeInterval($0) * 60 }
-                        ),
-                        in: 1...240
-                    ) {
-                        Text("\(Int(data.durationSeconds / 60)) min")
-                            .monospacedDigit()
-                    }
+                    TextField(
+                        "",
+                        value: triggerMinutesBinding,
+                        format: .number
+                    )
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+                    .frame(width: 48)
+                    #if os(iOS)
+                    .keyboardType(.numberPad)
+                    #endif
+                    .textFieldStyle(.roundedBorder)
+                    Text("min")
+                        .foregroundStyle(.secondary)
+                    Stepper("", value: triggerMinutesBinding, in: 1...240)
+                        .labelsHidden()
                 }
                 .font(.subheadline)
                 .disabled(isRunning)
