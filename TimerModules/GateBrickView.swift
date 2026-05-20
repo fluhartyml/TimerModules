@@ -45,7 +45,8 @@ struct GateBrickView: View {
 
             GateGlyphShape(gateType: gateType)
                 .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, lineJoin: .round))
-                .frame(width: 42, height: 25)
+                .aspectRatio(5.0/3.0, contentMode: .fit)
+                .padding(8)
         }
         .frame(width: 56, height: 56)
     }

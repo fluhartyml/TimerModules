@@ -147,11 +147,18 @@ struct BrickPaletteView: View {
         }
     }
 
-    /// Renders either an SF Symbol (most bricks) or a mathematical-
-    /// operator text glyph (logic gates) depending on the BrickType.
+    /// Renders the IEEE-91 distinctive-shape gate hieroglyph for
+    /// logic-gate tiles (Michael 2026-05-20 — "the logic gates
+    /// pallet is still the old fonts used"), an SF Symbol for most
+    /// other bricks, or a Unicode text glyph as a last resort.
     @ViewBuilder
     private func tileGlyph(_ type: BrickType) -> some View {
-        if let symbolName = type.symbolName {
+        if isLogicGate(type) {
+            GateGlyphShape(gateType: type)
+                .stroke(style: StrokeStyle(lineWidth: 1.8, lineJoin: .round))
+                .aspectRatio(5.0/3.0, contentMode: .fit)
+                .padding(.horizontal, 4)
+        } else if let symbolName = type.symbolName {
             Image(systemName: symbolName)
                 .font(.system(size: 22))
         } else if let glyph = type.textGlyph {
@@ -160,6 +167,15 @@ struct BrickPaletteView: View {
         } else {
             Image(systemName: "questionmark.square.dashed")
                 .font(.system(size: 22))
+        }
+    }
+
+    private func isLogicGate(_ type: BrickType) -> Bool {
+        switch type {
+        case .andGate, .orGate, .notGate, .nandGate, .norGate, .xorGate, .xnorGate:
+            return true
+        default:
+            return false
         }
     }
 }
