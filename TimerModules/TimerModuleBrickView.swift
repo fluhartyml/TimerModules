@@ -126,6 +126,18 @@ struct TimerModuleBrickView: View {
         .padding(16)
         .frame(width: 320, alignment: .top)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            // Active-state focus ring (Michael 2026-05-20: "i dont
+            // even know which module has focus"). The whole card
+            // gains an accent-colored ring while the timer is
+            // running so the user can see at a glance which module
+            // the program is currently in.
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(
+                    isRunning ? Color.accentColor : Color.clear,
+                    lineWidth: 3
+                )
+        )
         .overlay(alignment: .topTrailing) {
             noteGlyphButton.padding(6)
         }
