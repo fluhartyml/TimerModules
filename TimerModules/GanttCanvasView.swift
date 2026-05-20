@@ -502,18 +502,33 @@ struct GanttCanvasView: View {
     }
 
     private func drawArrow(in ctx: GraphicsContext, from start: CGPoint, to end: CGPoint, color: Color) {
-        let dx = end.x - start.x
-        let controlOffset = max(40, abs(dx) * 0.4)
-        let c1 = CGPoint(x: start.x + controlOffset, y: start.y)
-        let c2 = CGPoint(x: end.x   - controlOffset, y: end.y)
+        // Orthogonal right-angle routing through a lane below the
+        // source/destination (Michael 2026-05-20 — "the trace should
+        // take the lane below"). The wire exits the source's right
+        // edge, drops to a horizontal highway below both endpoints,
+        // crosses to the destination's column, and rises to enter the
+        // destination's left edge. This keeps wires off the faces of
+        // unrelated cards.
+        let laneGap: CGFloat = 24
+        let lane = max(start.y, end.y) + laneGap
+
         var path = Path()
         path.move(to: start)
-        path.addCurve(to: end, control1: c1, control2: c2)
-        ctx.stroke(path, with: .color(color.opacity(0.85)), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+        path.addLine(to: CGPoint(x: start.x, y: lane))
+        path.addLine(to: CGPoint(x: end.x,   y: lane))
+        path.addLine(to: end)
+        ctx.stroke(
+            path,
+            with: .color(color.opacity(0.85)),
+            style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+        )
 
+        // Arrowhead at the destination. The final approach segment is
+        // vertical (lane → end), so the head points along that axis.
         let theta: CGFloat = .pi / 7
         let headLength: CGFloat = 10
-        let angle = atan2(end.y - c2.y, end.x - c2.x)
+        let approach = CGPoint(x: end.x, y: lane)
+        let angle = atan2(end.y - approach.y, end.x - approach.x)
         let h1 = CGPoint(
             x: end.x - headLength * cos(angle - theta),
             y: end.y - headLength * sin(angle - theta)
