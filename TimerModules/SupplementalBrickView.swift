@@ -417,25 +417,55 @@ struct SupplementalBrickView: View {
     }
 
     // MARK: Loop
+    //
+    // Until-signal Loop (Michael 2026-05-20). No repeat count — the
+    // loop runs its body in a tight cycle and halts when ANY wired
+    // upstream signal arrives. The user composes the halt condition
+    // OUTSIDE the loop (e.g. a Work-Day countdown timer wired to the
+    // loop's left edge becomes the halt source; AND/OR gates compose
+    // multi-source halt conditions).
+    //
+    // The `loopCount` field on SupplementalBrickData stays in the
+    // model dormant for SwiftData migration safety; it's not read
+    // anywhere in code anymore.
+
+    @State private var showingLoopBodyPicker = false
 
     private var loopBody: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Repeat").foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(.brown)
+                Text("Runs until halt signal arrives")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 6) {
+                Text("Body:")
+                    .foregroundStyle(.secondary)
+                Text("\(data.containedBrickIds.count) module\(data.containedBrickIds.count == 1 ? "" : "s")")
+                    .monospacedDigit()
                 Spacer()
-                Stepper(
-                    value: $data.loopCount,
-                    in: 1...1000
-                ) {
-                    Text("\(data.loopCount)×")
-                        .monospacedDigit()
+                Button {
+                    showingLoopBodyPicker = true
+                } label: {
+                    Label("Manage", systemImage: "rectangle.stack.badge.plus")
+                        .labelStyle(.titleAndIcon)
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
             .font(.subheadline)
 
-            Text("\(data.containedBrickIds.count) brick(s) in loop body")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            if data.containedBrickIds.isEmpty {
+                Text("Tap Manage to choose which modules re-fire each iteration.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .sheet(isPresented: $showingLoopBodyPicker) {
+            LoopBodyPickerSheet(loop: data)
         }
     }
 
