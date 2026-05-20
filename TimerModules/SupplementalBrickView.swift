@@ -17,17 +17,46 @@ struct SupplementalBrickView: View {
     private var brickType: BrickType { data.brickType }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-            typeSpecificBody
-            notationField
+        if brickType == .endBrick {
+            // End cards are a fraction of the standard supplemental
+            // size (Michael 2026-05-20: "space is premium" — the
+            // whole card means "program stops here," so it doesn't
+            // need a header, body, or notation field; the red stop
+            // glyph + the word "End" carry the meaning).
+            compactEndCard
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                header
+                typeSpecificBody
+                notationField
+            }
+            .padding(18)
+            .frame(maxWidth: 360)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(brickColor.opacity(0.4), lineWidth: 1)
+            )
         }
-        .padding(18)
-        .frame(maxWidth: 360)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    // MARK: Compact End card
+
+    private var compactEndCard: some View {
+        VStack(spacing: 4) {
+            Image(systemName: "stop.circle.fill")
+                .font(.system(size: 32))
+                .foregroundStyle(.red)
+            Text("End")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.red)
+        }
+        .padding(8)
+        .frame(width: 76)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(brickColor.opacity(0.4), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.red.opacity(0.4), lineWidth: 1)
         )
     }
 
