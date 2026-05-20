@@ -479,7 +479,14 @@ struct GanttCanvasView: View {
                 for destId in trace.destinationBrickIds {
                     guard let destFrame = brickFrames[destId] else { continue }
                     let destPoint = anchorPoint(of: destFrame, side: trace.destinationAnchor)
-                    drawArrow(in: ctx, from: srcPoint, to: destPoint, color: edgeColor(for: trace))
+                    drawArrow(
+                        in: ctx,
+                        from: srcPoint,
+                        to: destPoint,
+                        srcFrame: srcFrame,
+                        destFrame: destFrame,
+                        color: edgeColor(for: trace)
+                    )
                 }
             }
         }
@@ -501,21 +508,39 @@ struct GanttCanvasView: View {
         }
     }
 
-    private func drawArrow(in ctx: GraphicsContext, from start: CGPoint, to end: CGPoint, color: Color) {
-        // Orthogonal right-angle routing through a lane below the
-        // source/destination (Michael 2026-05-20 — "the trace should
-        // take the lane below"). The wire exits the source's right
-        // edge, drops to a horizontal highway below both endpoints,
-        // crosses to the destination's column, and rises to enter the
-        // destination's left edge. This keeps wires off the faces of
-        // unrelated cards.
-        let laneGap: CGFloat = 24
-        let lane = max(start.y, end.y) + laneGap
+    private func drawArrow(
+        in ctx: GraphicsContext,
+        from start: CGPoint,
+        to end: CGPoint,
+        srcFrame: CGRect,
+        destFrame: CGRect,
+        color: Color
+    ) {
+        // Orthogonal lane-below routing with horizontal stubs at both
+        // endpoints (Michael 2026-05-20: "the trace is covering a
+        // module"). Previous version put the lane at max(srcMid,
+        // destMid) + 24 which fell INSIDE the card body, and entered
+        // the destination's left-edge midpoint vertically — both
+        // caused the wire to cross card faces.
+        //
+        // The new path: exits the source's right edge with a short
+        // horizontal stub, drops to a lane below BOTH card bottoms,
+        // crosses to the destination's column, and approaches the
+        // destination from the left with another horizontal stub. The
+        // wire never enters any card body.
+        let stubGap: CGFloat = 10
+        let laneGap: CGFloat = 18
+        let lane = max(srcFrame.maxY, destFrame.maxY) + laneGap
+
+        let srcStub  = CGPoint(x: start.x + stubGap, y: start.y)
+        let destStub = CGPoint(x: end.x   - stubGap, y: end.y)
 
         var path = Path()
         path.move(to: start)
-        path.addLine(to: CGPoint(x: start.x, y: lane))
-        path.addLine(to: CGPoint(x: end.x,   y: lane))
+        path.addLine(to: srcStub)
+        path.addLine(to: CGPoint(x: srcStub.x,  y: lane))
+        path.addLine(to: CGPoint(x: destStub.x, y: lane))
+        path.addLine(to: destStub)
         path.addLine(to: end)
         ctx.stroke(
             path,
@@ -524,11 +549,10 @@ struct GanttCanvasView: View {
         )
 
         // Arrowhead at the destination. The final approach segment is
-        // vertical (lane → end), so the head points along that axis.
+        // horizontal (destStub → end), so the head points right.
         let theta: CGFloat = .pi / 7
         let headLength: CGFloat = 10
-        let approach = CGPoint(x: end.x, y: lane)
-        let angle = atan2(end.y - approach.y, end.x - approach.x)
+        let angle = atan2(end.y - destStub.y, end.x - destStub.x)
         let h1 = CGPoint(
             x: end.x - headLength * cos(angle - theta),
             y: end.y - headLength * sin(angle - theta)
