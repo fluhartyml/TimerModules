@@ -70,6 +70,17 @@ enum SignalRouter {
         firedInputs[chartId] = [:]
     }
 
+    /// Clears every per-chart runtime tracking map so a fresh
+    /// program run starts clean. Without this, state from a
+    /// previous run leaks into the next — e.g. a Loop appears
+    /// "already running" so its first incoming signal is treated as
+    /// a halt request, halting the new run immediately. (Michael
+    /// 2026-05-20: "loop halt requested? i didnt request it.")
+    private static func resetRuntimeState(chartId: UUID) {
+        firedInputs[chartId] = [:]
+        runningLoops[chartId] = nil
+    }
+
     private static func recordInput(traceId: UUID, atGate gateId: UUID, chartId: UUID) {
         firedInputs[chartId, default: [:]][gateId, default: []].insert(traceId)
     }
@@ -93,7 +104,7 @@ enum SignalRouter {
         // the trigger-level event below records WHICH brick
         // initiated the run.
         let runId = runners[chartId]?.start(in: context) ?? UUID()
-        resetFiredInputs(chartId: chartId)
+        resetRuntimeState(chartId: chartId)
 
         log(
             eventType: "triggerFired",
@@ -116,6 +127,13 @@ enum SignalRouter {
     /// state being "ended" (Michael caught this bug 2026-05-19).
     static func stopAllRunningTimers(chartId: UUID, in context: ModelContext) {
         let runId = currentRunId(for: chartId)
+
+        // Wipe per-chart runtime tracking so the next program run
+        // starts clean — otherwise a Loop's running-state leaks into
+        // the next Start and the first incoming signal is treated as
+        // a halt (Michael 2026-05-20).
+        runningLoops[chartId] = nil
+
         let runningTimers = (try? context.fetch(
             FetchDescriptor<TimerModuleData>(
                 predicate: #Predicate { $0.ganttChartId == chartId && $0.runningSince != nil }
@@ -150,7 +168,7 @@ enum SignalRouter {
     static func startProgram(chartId: UUID, in context: ModelContext) {
         guard let runner = runners[chartId] else { return }
         let runId = runner.start(in: context)
-        resetFiredInputs(chartId: chartId)
+        resetRuntimeState(chartId: chartId)
 
         let row0Timers = (try? context.fetch(
             FetchDescriptor<TimerModuleData>(
