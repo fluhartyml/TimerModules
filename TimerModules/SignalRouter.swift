@@ -594,26 +594,53 @@ enum SignalRouter {
         // Only contained TIMERS are tracked for iteration completion.
         // Gates / actions / etc. fire once per iteration but don't
         // gate the iteration's progress.
+        //
+        // Sequencing within the body: ALL contained timers are reset
+        // to zero accumulated each iteration, but only the "head"
+        // timers — those with no incoming FS / SS edge from another
+        // body brick — are started immediately. Their downstream
+        // timers wait for the predecessor's completion to fire the
+        // wire (Michael 2026-05-20: "the work block and the break
+        // are both running, i probably should have trased them").
+        let bodySet = Set(loop.containedBrickIds)
+        let chartTraces: [TraceData] = (try? context.fetch(
+            FetchDescriptor<TraceData>(
+                predicate: #Predicate { $0.ganttChartId == chartId }
+            )
+        )) ?? []
+
         var pendingTimerIds: Set<UUID> = []
         for brickId in loop.containedBrickIds {
             if let timer = fetchOne(
                 TimerModuleData.self, id: brickId, chartId: chartId, in: context
             ) {
                 pendingTimerIds.insert(timer.id)
-                // Reset and start
                 timer.accumulatedSeconds = 0
-                timer.runningSince = Date()
                 timer.updatedDate = Date()
-                log(
-                    eventType: "timerStarted",
-                    brickId: timer.id,
-                    brickTypeRaw: BrickType.timerModule.rawValue,
-                    brickNotation: timer.notation,
-                    ganttChartId: chartId,
-                    runId: runId,
-                    noteIfAny: timer.note,
-                    in: context
-                )
+
+                let hasIncomingFromBody = chartTraces.contains { trace in
+                    guard trace.isWired, let src = trace.sourceBrickId else { return false }
+                    return bodySet.contains(src)
+                        && trace.destinationBrickIds.contains(timer.id)
+                }
+
+                if hasIncomingFromBody {
+                    // Wait for predecessor's FS / SS edge to fire.
+                    timer.runningSince = nil
+                } else {
+                    // Head of the dependency chain — start now.
+                    timer.runningSince = Date()
+                    log(
+                        eventType: "timerStarted",
+                        brickId: timer.id,
+                        brickTypeRaw: BrickType.timerModule.rawValue,
+                        brickNotation: timer.notation,
+                        ganttChartId: chartId,
+                        runId: runId,
+                        noteIfAny: timer.note,
+                        in: context
+                    )
+                }
             } else if let sup = fetchOne(
                 SupplementalBrickData.self, id: brickId, chartId: chartId, in: context
             ) {
