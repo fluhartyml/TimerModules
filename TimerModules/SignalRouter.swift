@@ -28,6 +28,25 @@ enum SignalRouter {
     /// M5.7 (Michael 2026-05-19).
     private static var runners: [UUID: ProgramRunner] = [:]
 
+    /// In-flight Loop iterations keyed by chartId → loopId. A loop
+    /// becomes "running" the first time a signal lands on it; a
+    /// second signal sets `haltRequested`; the current iteration
+    /// finishes before the loop exits to its downstream.
+    /// (Michael 2026-05-20 — until-signal Loop semantics.)
+    private struct LoopState {
+        var iterationCount: Int = 0
+        var haltRequested: Bool = false
+        /// Brick IDs in the loop body that haven't fired yet this
+        /// iteration. Decremented as each completes; when empty, the
+        /// iteration is over.
+        var pendingBrickIds: Set<UUID> = []
+    }
+    private static var runningLoops: [UUID: [UUID: LoopState]] = [:]
+
+    /// Safety cap so an unwired Loop (no halt source) can't iterate
+    /// forever and lock the app.
+    private static let loopSafetyCap: Int = 10_000
+
     static func register(_ runner: ProgramRunner) {
         runners[runner.chartId] = runner
     }
@@ -185,6 +204,15 @@ enum SignalRouter {
             elapsedSeconds: elapsed,
             runId: runId,
             noteIfAny: timer.note,
+            in: context
+        )
+
+        // If this timer is in a running Loop's body, let the loop
+        // tick its pending-set so it can iterate or exit.
+        notifyLoopsOfTimerCompletion(
+            timerId: timer.id,
+            chartId: chartId,
+            runId: runId,
             in: context
         )
 
@@ -490,6 +518,8 @@ enum SignalRouter {
                 noteIfAny: sup.note,
                 in: context
             )
+        case .loop:
+            handleLoopSignal(sup, runId: runId, in: context)
         default:
             log(
                 eventType: "signalReceived",
@@ -500,6 +530,183 @@ enum SignalRouter {
                 runId: runId,
                 in: context
             )
+        }
+    }
+
+    // MARK: Loop semantics (Michael 2026-05-20)
+    //
+    // A Loop is "started" the first time it receives any signal.
+    // A SECOND signal arrives during execution sets `haltRequested`
+    // — the current iteration is allowed to finish, then the loop
+    // exits to its downstream. Each iteration RESETS the contained
+    // timers (accumulated = 0, runningSince = now) before firing
+    // them, so they actually run their full duration each pass.
+
+    private static func handleLoopSignal(
+        _ loop: SupplementalBrickData,
+        runId: UUID,
+        in context: ModelContext
+    ) {
+        guard let chartId = loop.ganttChartId else { return }
+
+        if runningLoops[chartId]?[loop.id] == nil {
+            // First signal — start the loop
+            startLoopIteration(loop, chartId: chartId, runId: runId, in: context)
+        } else {
+            // Subsequent signal — flag for halt at end of current iteration
+            runningLoops[chartId]?[loop.id]?.haltRequested = true
+            log(
+                eventType: "loopHaltRequested",
+                brickId: loop.id,
+                brickTypeRaw: loop.brickTypeRaw,
+                brickNotation: loop.notation,
+                ganttChartId: chartId,
+                runId: runId,
+                in: context
+            )
+        }
+    }
+
+    private static func startLoopIteration(
+        _ loop: SupplementalBrickData,
+        chartId: UUID,
+        runId: UUID,
+        in context: ModelContext
+    ) {
+        let prev = runningLoops[chartId]?[loop.id]
+        let newCount = (prev?.iterationCount ?? 0) + 1
+
+        if newCount > loopSafetyCap {
+            log(
+                eventType: "loopSafetyCapHit",
+                brickId: loop.id,
+                brickTypeRaw: loop.brickTypeRaw,
+                brickNotation: loop.notation,
+                ganttChartId: chartId,
+                payloadJSON: "{\"cap\":\(loopSafetyCap)}",
+                runId: runId,
+                in: context
+            )
+            exitLoop(loop, chartId: chartId, runId: runId, in: context)
+            return
+        }
+
+        // Only contained TIMERS are tracked for iteration completion.
+        // Gates / actions / etc. fire once per iteration but don't
+        // gate the iteration's progress.
+        var pendingTimerIds: Set<UUID> = []
+        for brickId in loop.containedBrickIds {
+            if let timer = fetchOne(
+                TimerModuleData.self, id: brickId, chartId: chartId, in: context
+            ) {
+                pendingTimerIds.insert(timer.id)
+                // Reset and start
+                timer.accumulatedSeconds = 0
+                timer.runningSince = Date()
+                timer.updatedDate = Date()
+                log(
+                    eventType: "timerStarted",
+                    brickId: timer.id,
+                    brickTypeRaw: BrickType.timerModule.rawValue,
+                    brickNotation: timer.notation,
+                    ganttChartId: chartId,
+                    runId: runId,
+                    noteIfAny: timer.note,
+                    in: context
+                )
+            } else if let sup = fetchOne(
+                SupplementalBrickData.self, id: brickId, chartId: chartId, in: context
+            ) {
+                handleSupplementalSignal(sup, runId: runId, in: context)
+            }
+        }
+
+        runningLoops[chartId, default: [:]][loop.id] = LoopState(
+            iterationCount: newCount,
+            haltRequested: prev?.haltRequested ?? false,
+            pendingBrickIds: pendingTimerIds
+        )
+
+        log(
+            eventType: "loopIterationStarted",
+            brickId: loop.id,
+            brickTypeRaw: loop.brickTypeRaw,
+            brickNotation: loop.notation,
+            ganttChartId: chartId,
+            payloadJSON: "{\"iteration\":\(newCount),\"bodySize\":\(pendingTimerIds.count)}",
+            runId: runId,
+            noteIfAny: loop.note,
+            in: context
+        )
+
+        // If the body has NO timers at all the iteration is instantly
+        // done — without this the loop would silently freeze.
+        if pendingTimerIds.isEmpty {
+            finishLoopIteration(loopId: loop.id, chartId: chartId, runId: runId, in: context)
+        }
+    }
+
+    private static func finishLoopIteration(
+        loopId: UUID,
+        chartId: UUID,
+        runId: UUID,
+        in context: ModelContext
+    ) {
+        guard let state = runningLoops[chartId]?[loopId],
+              let loop = fetchOne(
+                SupplementalBrickData.self, id: loopId, chartId: chartId, in: context
+              ) else { return }
+
+        if state.haltRequested {
+            exitLoop(loop, chartId: chartId, runId: runId, in: context)
+        } else {
+            startLoopIteration(loop, chartId: chartId, runId: runId, in: context)
+        }
+    }
+
+    private static func exitLoop(
+        _ loop: SupplementalBrickData,
+        chartId: UUID,
+        runId: UUID,
+        in context: ModelContext
+    ) {
+        runningLoops[chartId]?[loop.id] = nil
+        log(
+            eventType: "loopExited",
+            brickId: loop.id,
+            brickTypeRaw: loop.brickTypeRaw,
+            brickNotation: loop.notation,
+            ganttChartId: chartId,
+            runId: runId,
+            in: context
+        )
+        propagate(from: loop.id, in: chartId, runId: runId, in: context)
+    }
+
+    /// Called by fireTimerCompletion right after a Timer logs its
+    /// completion. If the timer is part of any running loop's pending
+    /// set, decrement that set; when it empties, the iteration ends.
+    private static func notifyLoopsOfTimerCompletion(
+        timerId: UUID,
+        chartId: UUID,
+        runId: UUID,
+        in context: ModelContext
+    ) {
+        guard let loops = runningLoops[chartId] else { return }
+        for (loopId, _) in loops {
+            guard var state = runningLoops[chartId]?[loopId] else { continue }
+            if state.pendingBrickIds.contains(timerId) {
+                state.pendingBrickIds.remove(timerId)
+                runningLoops[chartId]?[loopId] = state
+                if state.pendingBrickIds.isEmpty {
+                    finishLoopIteration(
+                        loopId: loopId,
+                        chartId: chartId,
+                        runId: runId,
+                        in: context
+                    )
+                }
+            }
         }
     }
 
