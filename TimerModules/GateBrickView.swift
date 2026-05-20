@@ -17,45 +17,17 @@ struct GateBrickView: View {
     private var gateType: BrickType { data.gateType }
 
     var body: some View {
-        VStack(alignment: .center, spacing: 6) {
-            notationField
+        VStack(alignment: .center, spacing: 4) {
             glyphFace
             gateNameLabel
         }
         .padding(8)
-        .frame(width: 100)
+        .frame(width: 76)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.orange.opacity(0.35), lineWidth: 1)
         )
-    }
-
-    // MARK: Notation field (editable, same pattern as Timer brick)
-    //
-    // Compact layout: pencil icon dropped to save horizontal room;
-    // the TextField itself reads as the label. The 18pt font is the
-    // iPad-readability floor (`feedback_18pt_minimum_font`) but the
-    // field allows truncation so a long label collapses with "…"
-    // rather than pushing the card wider.
-
-    private var notationField: some View {
-        TextField("Label", text: $data.notation)
-            .font(.system(size: 13, weight: .semibold))
-            .multilineTextAlignment(.center)
-            .textFieldStyle(.plain)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(.thinMaterial)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.orange.opacity(0.25), lineWidth: 1)
-            )
     }
 
     // MARK: Operator glyph (shrunk to fit the compact card footprint)
