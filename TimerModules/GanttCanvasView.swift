@@ -559,11 +559,26 @@ struct GanttCanvasView: View {
 
     @ViewBuilder
     private var traceEdgeOverlay: some View {
-        Canvas { ctx, size in
-            for trace in traces where trace.isWired {
+        // Build a UUID → ROYGBIV color map ordered by createdDate so
+        // each trace gets a distinct rainbow color in creation order
+        // (Michael 2026-05-20: "first trace created is red second
+        // trace created orange…blue indigo violet"). Past the 7th
+        // trace the palette cycles back to red.
+        let wiredTracesByCreation = traces
+            .filter { $0.isWired }
+            .sorted { $0.createdDate < $1.createdDate }
+        let traceColorById: [UUID: Color] = Dictionary(
+            uniqueKeysWithValues: wiredTracesByCreation.enumerated().map { idx, t in
+                (t.id, Self.rainbowPalette[idx % Self.rainbowPalette.count])
+            }
+        )
+
+        return Canvas { ctx, size in
+            for trace in wiredTracesByCreation {
                 guard let srcId = trace.sourceBrickId,
                       let srcFrame = brickFrames[srcId] else { continue }
                 let srcPoint = anchorPoint(of: srcFrame, side: trace.sourceAnchor)
+                let color = traceColorById[trace.id] ?? .blue
 
                 for destId in trace.destinationBrickIds {
                     guard let destFrame = brickFrames[destId] else { continue }
@@ -574,26 +589,29 @@ struct GanttCanvasView: View {
                         to: destPoint,
                         srcFrame: srcFrame,
                         destFrame: destFrame,
-                        color: edgeColor(for: trace)
+                        color: color
                     )
                 }
             }
         }
     }
 
+    /// ROYGBIV palette assigned to traces in creation order
+    /// (Michael 2026-05-20). After the 7th trace the cycle repeats.
+    private static let rainbowPalette: [Color] = [
+        .red,
+        .orange,
+        .yellow,
+        .green,
+        .blue,
+        .indigo,
+        .purple,    // "violet"
+    ]
+
     private func anchorPoint(of frame: CGRect, side: TraceAnchor) -> CGPoint {
         switch side {
         case .start:  return CGPoint(x: frame.minX, y: frame.midY)
         case .finish: return CGPoint(x: frame.maxX, y: frame.midY)
-        }
-    }
-
-    private func edgeColor(for trace: TraceData) -> Color {
-        switch trace.traceType {
-        case .fsEdge, .ssEdge, .ffEdge, .sfEdge: return .blue
-        case .lagLead:                            return .purple
-        case .splitter:                           return .teal
-        default:                                  return .gray
         }
     }
 
