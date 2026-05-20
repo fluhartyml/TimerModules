@@ -559,17 +559,18 @@ struct GanttCanvasView: View {
 
     @ViewBuilder
     private var traceEdgeOverlay: some View {
-        // Build a UUID → ROYGBIV color map ordered by createdDate so
-        // each trace gets a distinct rainbow color in creation order
-        // (Michael 2026-05-20: "first trace created is red second
-        // trace created orange…blue indigo violet"). Past the 7th
-        // trace the palette cycles back to red.
+        // Each trace gets its own color, auto-assigned by creation
+        // order. First trace is red (hue 0°); subsequent traces step
+        // around the color wheel by 360°/paletteSize so each is
+        // visually distinct from its neighbors (Michael 2026-05-20:
+        // "the color wheel approach"). User-pickable colors are
+        // deferred to a future upgrade.
         let wiredTracesByCreation = traces
             .filter { $0.isWired }
             .sorted { $0.createdDate < $1.createdDate }
         let traceColorById: [UUID: Color] = Dictionary(
             uniqueKeysWithValues: wiredTracesByCreation.enumerated().map { idx, t in
-                (t.id, Self.rainbowPalette[idx % Self.rainbowPalette.count])
+                (t.id, Self.colorWheelColor(for: idx))
             }
         )
 
@@ -596,17 +597,15 @@ struct GanttCanvasView: View {
         }
     }
 
-    /// ROYGBIV palette assigned to traces in creation order
-    /// (Michael 2026-05-20). After the 7th trace the cycle repeats.
-    private static let rainbowPalette: [Color] = [
-        .red,
-        .orange,
-        .yellow,
-        .green,
-        .blue,
-        .indigo,
-        .purple,    // "violet"
-    ]
+    /// 24-stop hue rotation starting at red. Saturation and
+    /// brightness fixed so every color reads clearly against the
+    /// dark canvas (Michael 2026-05-20).
+    private static let colorWheelSteps: Int = 24
+
+    private static func colorWheelColor(for index: Int) -> Color {
+        let step = Double(index % colorWheelSteps) / Double(colorWheelSteps)
+        return Color(hue: step, saturation: 0.85, brightness: 0.95)
+    }
 
     private func anchorPoint(of frame: CGRect, side: TraceAnchor) -> CGPoint {
         switch side {
