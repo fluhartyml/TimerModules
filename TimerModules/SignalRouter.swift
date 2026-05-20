@@ -83,6 +83,7 @@ enum SignalRouter {
             brickNotation: triggerLabel(trigger),
             ganttChartId: chartId,
             runId: runId,
+            noteIfAny: trigger.note,
             in: context
         )
 
@@ -153,6 +154,7 @@ enum SignalRouter {
                 brickNotation: timer.notation,
                 ganttChartId: chartId,
                 runId: runId,
+                noteIfAny: timer.note,
                 in: context
             )
             propagate(from: timer.id, in: chartId, runId: runId, in: context)
@@ -182,6 +184,7 @@ enum SignalRouter {
             ganttChartId: chartId,
             elapsedSeconds: elapsed,
             runId: runId,
+            noteIfAny: timer.note,
             in: context
         )
 
@@ -262,6 +265,7 @@ enum SignalRouter {
                 brickNotation: t.notation,
                 ganttChartId: chartId,
                 runId: runId,
+                noteIfAny: t.note,
                 in: context
             )
             propagate(from: t.id, in: chartId, runId: runId, in: context)
@@ -385,6 +389,7 @@ enum SignalRouter {
             ganttChartId: chartId,
             payloadJSON: "{\"inputs\":\(inputs),\"output\":true}",
             runId: runId,
+            noteIfAny: gate.note,
             in: context
         )
         propagate(from: gate.id, in: chartId, runId: runId, in: context)
@@ -411,6 +416,7 @@ enum SignalRouter {
                 brickNotation: timer.notation,
                 ganttChartId: chartId,
                 runId: runId,
+                noteIfAny: timer.note,
                 in: context
             )
         default:
@@ -438,6 +444,7 @@ enum SignalRouter {
                 brickNotation: sup.notation,
                 ganttChartId: chartId,
                 runId: runId,
+                noteIfAny: sup.note,
                 in: context
             )
 
@@ -450,6 +457,7 @@ enum SignalRouter {
                 ganttChartId: chartId,
                 payloadJSON: "{\"kind\":\"\(sup.kindRaw)\",\"config\":\"\(escape(sup.configString))\"}",
                 runId: runId,
+                noteIfAny: sup.note,
                 in: context
             )
             executeAction(sup)
@@ -464,6 +472,7 @@ enum SignalRouter {
                 ganttChartId: chartId,
                 payloadJSON: "{\"method\":\"\(sup.kindRaw)\",\"url\":\"\(escape(sup.configString))\"}",
                 runId: runId,
+                noteIfAny: sup.note,
                 in: context
             )
             sendWebhook(sup)
@@ -478,6 +487,7 @@ enum SignalRouter {
                 ganttChartId: chartId,
                 payloadJSON: "{\"value\":\(sup.variableValue)}",
                 runId: runId,
+                noteIfAny: sup.note,
                 in: context
             )
         default:
@@ -627,6 +637,7 @@ enum SignalRouter {
         payloadJSON: String = "",
         elapsedSeconds: TimeInterval? = nil,
         runId: UUID,
+        noteIfAny: String? = nil,
         in context: ModelContext
     ) {
         let entry = LogEntry(
@@ -641,5 +652,24 @@ enum SignalRouter {
             runId: runId
         )
         context.insert(entry)
+
+        // Michael 2026-05-20: when a module fires or gains focus in
+        // the program sequence, write a follow-up "moduleNote" entry
+        // carrying the module's free-form note (if any). This keeps
+        // the runtime log narrative-rich without firing on every
+        // Save tap.
+        if let note = noteIfAny, !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let noteEntry = LogEntry(
+                ganttChartId: ganttChartId,
+                brickId: brickId,
+                brickTypeRaw: brickTypeRaw,
+                brickNotation: brickNotation,
+                eventType: "moduleNote",
+                payloadJSON: note,
+                timestamp: Date(),
+                runId: runId
+            )
+            context.insert(noteEntry)
+        }
     }
 }

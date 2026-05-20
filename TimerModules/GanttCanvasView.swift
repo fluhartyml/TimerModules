@@ -332,12 +332,6 @@ struct GanttCanvasView: View {
             onSave: { newNote in
                 timer.note = newNote
                 timer.updatedDate = Date()
-                logNoteSaved(
-                    brickId: timer.id,
-                    brickTypeRaw: BrickType.timerModule.rawValue,
-                    brickNotation: timer.notation,
-                    note: newNote
-                )
             }
         )
     }
@@ -350,12 +344,6 @@ struct GanttCanvasView: View {
             onSave: { newNote in
                 gate.note = newNote
                 gate.updatedDate = Date()
-                logNoteSaved(
-                    brickId: gate.id,
-                    brickTypeRaw: gate.gateType.rawValue,
-                    brickNotation: gate.notation,
-                    note: newNote
-                )
             }
         )
     }
@@ -368,36 +356,8 @@ struct GanttCanvasView: View {
             onSave: { newNote in
                 sup.note = newNote
                 sup.updatedDate = Date()
-                logNoteSaved(
-                    brickId: sup.id,
-                    brickTypeRaw: sup.brickType.rawValue,
-                    brickNotation: sup.notation,
-                    note: newNote
-                )
             }
         )
-    }
-
-    /// Writes a LogEntry recording the saved note so it appears in
-    /// the LogView alongside runtime events. Each note save creates
-    /// its own runId (notes aren't part of any program run).
-    private func logNoteSaved(
-        brickId: UUID,
-        brickTypeRaw: String,
-        brickNotation: String,
-        note: String
-    ) {
-        let entry = LogEntry(
-            ganttChartId: chartId,
-            brickId: brickId,
-            brickTypeRaw: brickTypeRaw,
-            brickNotation: brickNotation,
-            eventType: "noteSaved",
-            payloadJSON: note,
-            timestamp: Date(),
-            runId: UUID()
-        )
-        modelContext.insert(entry)
     }
 
     /// Right-click / long-press context menu items for a card.
