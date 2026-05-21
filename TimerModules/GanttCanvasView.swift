@@ -48,6 +48,18 @@ struct GanttCanvasView: View {
     /// chooses "Edit note…" from its long-press / right-click menu.
     @State private var noteEditorTarget: NoteEditorTarget? = nil
 
+    /// Persistent zoom scale that survives between pinch gestures
+    /// (Michael 2026-05-20 — pinch zoom). `gestureZoom` is the
+    /// live multiplier during an active pinch; on gesture end the
+    /// product gets folded into baseZoom and gestureZoom resets.
+    @State private var baseZoom: CGFloat = 1.0
+    @State private var gestureZoom: CGFloat = 1.0
+
+    /// Hard clamp on pinch zoom: 0.5x to 4x.
+    private var combinedZoom: CGFloat {
+        min(max(baseZoom * gestureZoom, 0.5), 4.0)
+    }
+
     /// Identifiable wrapper around an open note-editor session so a
     /// single `.sheet(item:)` modifier on the canvas can present the
     /// editor for any brick type.
@@ -185,6 +197,21 @@ struct GanttCanvasView: View {
                     onSave: target.onSave
                 )
             }
+            // Pinch-to-zoom (Michael 2026-05-20). Anchored at the
+            // center; user can pan around afterward with the
+            // existing ScrollView drag. `simultaneousGesture` so
+            // the pinch and ScrollView's pan can both recognize.
+            .scaleEffect(combinedZoom, anchor: .center)
+            .simultaneousGesture(
+                MagnifyGesture()
+                    .onChanged { value in
+                        gestureZoom = value.magnification
+                    }
+                    .onEnded { _ in
+                        baseZoom = combinedZoom
+                        gestureZoom = 1.0
+                    }
+            )
         }
     }
 
@@ -623,35 +650,90 @@ struct GanttCanvasView: View {
     @ViewBuilder
     private var traceDeleteHandles: some View {
         ZStack(alignment: .topLeading) {
-            ForEach(traces.filter { $0.isWired }) { trace in
-                if let pos = traceMidpoint(trace) {
-                    Button {
-                        deleteTrace(trace)
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16, weight: .semibold))
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, .red)
-                            .background(
-                                Circle()
-                                    .fill(.black.opacity(0.4))
-                                    .frame(width: 22, height: 22)
-                            )
-                            .frame(width: 28, height: 28)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Delete this trace")
-                    .position(x: pos.x, y: pos.y)
+            ForEach(deconflictedHandles, id: \.traceId) { handle in
+                Button {
+                    deleteTrace(handle.trace)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, .red)
+                        .background(
+                            Circle()
+                                .fill(.black.opacity(0.4))
+                                .frame(width: 22, height: 22)
+                        )
+                        .frame(width: 28, height: 28)
+                        // Circle hit shape so taps only count when
+                        // they're on the visible ×, not on the
+                        // 28×28 bounding box's empty corners — keeps
+                        // a neighbor module's note glyph from
+                        // catching taps meant for the × (Michael
+                        // 2026-05-20).
+                        .contentShape(Circle())
                 }
+                .buttonStyle(.plain)
+                .help("Delete this trace")
+                .position(x: handle.position.x, y: handle.position.y)
             }
         }
+        // Win the layer race against per-card overlays (e.g. note
+        // glyph buttons) so the × button is always on top when the
+        // positions happen to coincide.
+        .zIndex(10)
         .allowsHitTesting(true)
     }
 
-    /// Lane-midpoint position for a trace's delete handle. Returns
-    /// nil if the trace's source/destination frames haven't been
-    /// measured yet (transient first-render state).
+    /// Position + trace pair after running deconfliction so two ×
+    /// markers landing on nearly-identical coordinates get nudged
+    /// apart vertically (Michael 2026-05-20 — preemptive). The first
+    /// of any colliding pair keeps its computed Y; the others shift
+    /// by ±18pt alternately so the pair is two distinct tappable
+    /// targets even before pinch-zoom magnification.
+    private var deconflictedHandles: [TraceHandle] {
+        let raw = traces
+            .filter { $0.isWired }
+            .compactMap { trace -> TraceHandle? in
+                guard let pos = traceMidpoint(trace) else { return nil }
+                return TraceHandle(traceId: trace.id, trace: trace, position: pos)
+            }
+        var placed: [TraceHandle] = []
+        let collisionRadius: CGFloat = 22
+        for var candidate in raw {
+            var attempt = 0
+            while placed.contains(where: { hypot($0.position.x - candidate.position.x,
+                                                 $0.position.y - candidate.position.y) < collisionRadius }) {
+                attempt += 1
+                let dy: CGFloat = (attempt % 2 == 1 ? 1 : -1) * 18 * CGFloat((attempt + 1) / 2)
+                candidate = TraceHandle(
+                    traceId: candidate.traceId,
+                    trace: candidate.trace,
+                    position: CGPoint(x: candidate.position.x, y: candidate.position.y + dy)
+                )
+                if attempt > 6 { break }
+            }
+            placed.append(candidate)
+        }
+        return placed
+    }
+
+    private struct TraceHandle {
+        let traceId: UUID
+        let trace: TraceData
+        let position: CGPoint
+    }
+
+    /// Returns the on-trace midpoint position for a × delete handle.
+    ///
+    /// For **adjacent same-row** traces (source and destination at
+    /// roughly the same midY and their X edges essentially touching
+    /// across the inter-card gap) the wire is drawn as a straight
+    /// short segment in the gap; the × sits on that segment at the
+    /// average of the two attachment Y values (Michael 2026-05-20).
+    ///
+    /// For all other traces (cross-row, or same-row with intervening
+    /// cards) the wire takes the lane-below detour and the × sits at
+    /// the midpoint of the lane segment.
     private func traceMidpoint(_ trace: TraceData) -> CGPoint? {
         guard let srcId = trace.sourceBrickId,
               let srcFrame = brickFrames[srcId],
@@ -659,12 +741,37 @@ struct GanttCanvasView: View {
               let destFrame = brickFrames[destId] else { return nil }
         let srcPoint = anchorPoint(of: srcFrame, side: trace.sourceAnchor)
         let destPoint = anchorPoint(of: destFrame, side: trace.destinationAnchor)
+
+        if isAdjacentSameRow(srcFrame: srcFrame, destFrame: destFrame) {
+            return CGPoint(
+                x: (srcPoint.x + destPoint.x) / 2,
+                y: (srcPoint.y + destPoint.y) / 2
+            )
+        }
+
         let laneGap: CGFloat = 18
         let lane = max(srcFrame.maxY, destFrame.maxY) + laneGap
         return CGPoint(
             x: (srcPoint.x + destPoint.x) / 2,
             y: lane
         )
+    }
+
+    /// True when source and destination sit on the same row at
+    /// matching midY and their adjacent edges are within one inter-
+    /// card gap. Used by both the × placement helper and drawArrow
+    /// so the wire and its handle stay in sync.
+    private func isAdjacentSameRow(srcFrame: CGRect, destFrame: CGRect) -> Bool {
+        let sameRow = abs(srcFrame.midY - destFrame.midY) < 6
+        let leftToRight = srcFrame.maxX <= destFrame.minX
+        let rightToLeft = destFrame.maxX <= srcFrame.minX
+        guard sameRow, leftToRight || rightToLeft else { return false }
+        let horizontalGap = leftToRight
+            ? destFrame.minX - srcFrame.maxX
+            : srcFrame.minX - destFrame.maxX
+        // Row HStack spacing is 10pt — anything ≤ 24pt apart is
+        // visually "right next to each other" for the user.
+        return horizontalGap <= 24
     }
 
     private func deleteTrace(_ trace: TraceData) {
@@ -699,6 +806,46 @@ struct GanttCanvasView: View {
         // crosses to the destination's column, and approaches the
         // destination from the left with another horizontal stub. The
         // wire never enters any card body.
+        // Adjacent same-row shortcut: source and destination are
+        // right next to each other in the same row, so the wire is
+        // just a short straight segment in the inter-card gap — no
+        // need to detour down to a lane and back up. (Michael
+        // 2026-05-20: "pomerado work and pomerado break
+        // connecterpoints are right next to each other so i should
+        // only see a red x and no green trace.")
+        if isAdjacentSameRow(srcFrame: srcFrame, destFrame: destFrame) {
+            var path = Path()
+            path.move(to: start)
+            path.addLine(to: end)
+            ctx.stroke(
+                path,
+                with: .color(color.opacity(0.85)),
+                style: StrokeStyle(lineWidth: 2, lineCap: .round)
+            )
+            // Arrowhead at the destination pointing in along the
+            // segment direction.
+            let theta: CGFloat = .pi / 7
+            let headLength: CGFloat = 10
+            let angle = atan2(end.y - start.y, end.x - start.x)
+            let h1 = CGPoint(
+                x: end.x - headLength * cos(angle - theta),
+                y: end.y - headLength * sin(angle - theta)
+            )
+            let h2 = CGPoint(
+                x: end.x - headLength * cos(angle + theta),
+                y: end.y - headLength * sin(angle + theta)
+            )
+            var head = Path()
+            head.move(to: end); head.addLine(to: h1)
+            head.move(to: end); head.addLine(to: h2)
+            ctx.stroke(
+                head,
+                with: .color(color.opacity(0.85)),
+                style: StrokeStyle(lineWidth: 2, lineCap: .round)
+            )
+            return
+        }
+
         // Stub width must stay smaller than the inter-card spacing
         // (HStack spacing: 10 on the row) so the vertical drop lands
         // INSIDE the gap between cards rather than ON the next card's
