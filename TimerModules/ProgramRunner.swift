@@ -125,6 +125,12 @@ final class ProgramRunner {
     private func handleHeartbeat(in context: ModelContext) {
         guard isRunning else { return }
         tick += 1
+        // Advance any Delay modules in this chart that are currently
+        // counting down. Master Design Spec 18.5: each displayed
+        // digit holds for 1 second, so each heartbeat tick decrements
+        // the displayed countdown; on the post-"0" tick the Delay
+        // fires its outgoing trace and clears its countdown state.
+        SignalRouter.advanceRunningDelays(chartId: chartId, in: context)
         // Future work: drive gate settle evaluation on each tick
         // (M5.7 phase 4 — input gating + heartbeat-driven evaluation).
     }

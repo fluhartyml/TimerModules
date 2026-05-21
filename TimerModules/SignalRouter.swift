@@ -350,6 +350,88 @@ enum SignalRouter {
             handleSupplementalSignal(sup, runId: runId, in: context)
             return
         }
+        if let delay = fetchOne(DelayBrickData.self, id: destId, chartId: chartId, in: context) {
+            handleDelaySignal(delay, runId: runId, in: context)
+            return
+        }
+    }
+
+    /// A trace fired into a Delay module — start its countdown.
+    /// The countdown is then advanced by the heartbeat via
+    /// advanceRunningDelays(chartId:in:) each second; the post-"0"
+    /// tick fires the Delay's outgoing trace.
+    private static func handleDelaySignal(
+        _ delay: DelayBrickData,
+        runId: UUID,
+        in context: ModelContext
+    ) {
+        guard let chartId = delay.ganttChartId else { return }
+
+        // If a countdown is already in flight, the second signal is
+        // ignored (no re-trigger; the original countdown still
+        // resolves). v1.0 keeps Delay strictly one-in-flight.
+        guard delay.currentCountdown == nil else { return }
+
+        delay.currentCountdown = delay.displayValue
+        delay.countdownStartedAt = Date()
+        delay.updatedDate = Date()
+
+        log(
+            eventType: "delayStarted",
+            brickId: delay.id,
+            brickTypeRaw: BrickType.delay.rawValue,
+            brickNotation: delay.notation.isEmpty ? "Delay" : delay.notation,
+            ganttChartId: chartId,
+            payloadJSON: "{\"heldSeconds\":\(delay.heldSeconds)}",
+            runId: runId,
+            noteIfAny: delay.note,
+            in: context
+        )
+    }
+
+    /// Called by ProgramRunner each 1Hz heartbeat tick. Walks every
+    /// active Delay in the chart, decrements its displayed digit,
+    /// and (when the countdown elapses the "0" hold) fires the
+    /// Delay's outgoing trace into the cascade.
+    static func advanceRunningDelays(chartId: UUID, in context: ModelContext) {
+        let active = (try? context.fetch(
+            FetchDescriptor<DelayBrickData>(
+                predicate: #Predicate { $0.ganttChartId == chartId && $0.currentCountdown != nil }
+            )
+        )) ?? []
+        guard !active.isEmpty else { return }
+
+        let runId = currentRunId(for: chartId)
+
+        for delay in active {
+            guard let current = delay.currentCountdown else { continue }
+
+            if current > 0 {
+                // Decrement to the next displayed digit. Per Master
+                // Design Spec 18.5: each digit holds for 1 second.
+                delay.currentCountdown = current - 1
+                delay.updatedDate = Date()
+            } else {
+                // The "0" hold has now elapsed (this tick AFTER the
+                // tick that displayed 0). Fire output + clear state.
+                delay.currentCountdown = nil
+                delay.countdownStartedAt = nil
+                delay.updatedDate = Date()
+
+                log(
+                    eventType: "delayFired",
+                    brickId: delay.id,
+                    brickTypeRaw: BrickType.delay.rawValue,
+                    brickNotation: delay.notation.isEmpty ? "Delay" : delay.notation,
+                    ganttChartId: chartId,
+                    runId: runId,
+                    noteIfAny: delay.note,
+                    in: context
+                )
+
+                propagate(from: delay.id, in: chartId, runId: runId, in: context)
+            }
+        }
     }
 
     /// Evaluate a gate's boolean against its current fired-input

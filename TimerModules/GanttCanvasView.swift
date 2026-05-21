@@ -39,6 +39,7 @@ struct GanttCanvasView: View {
     @Query private var traces:        [TraceData]
     @Query private var supplementals: [SupplementalBrickData]
     @Query private var starts:        [StartBrickData]
+    @Query private var delays:        [DelayBrickData]
 
     @State private var brickFrames: [UUID: CGRect] = [:]
     @State private var dropTargetedRow: Int? = nil
@@ -101,6 +102,7 @@ struct GanttCanvasView: View {
         case gate(GateBrickData)
         case supplemental(SupplementalBrickData)
         case start(StartBrickData)
+        case delay(DelayBrickData)
 
         var id: UUID {
             switch self {
@@ -108,6 +110,7 @@ struct GanttCanvasView: View {
             case .gate(let g):         return g.id
             case .supplemental(let s): return s.id
             case .start(let st):       return st.id
+            case .delay(let d):        return d.id
             }
         }
 
@@ -117,6 +120,7 @@ struct GanttCanvasView: View {
             case .gate(let g):         return g.order
             case .supplemental(let s): return s.order
             case .start(let st):       return st.order
+            case .delay(let d):        return d.order
             }
         }
 
@@ -126,6 +130,7 @@ struct GanttCanvasView: View {
             case .gate(let g):         return g.column
             case .supplemental(let s): return s.column
             case .start(let st):       return st.column
+            case .delay(let d):        return d.column
             }
         }
     }
@@ -135,7 +140,8 @@ struct GanttCanvasView: View {
         let g  = gates.map         { CanvasBrick.gate($0) }
         let s  = supplementals.map { CanvasBrick.supplemental($0) }
         let st = starts.map        { CanvasBrick.start($0) }
-        return t + g + s + st
+        let d  = delays.map        { CanvasBrick.delay($0) }
+        return t + g + s + st + d
     }
 
     /// Bricks grouped by row, with each row's bricks sorted by column.
@@ -339,6 +345,24 @@ struct GanttCanvasView: View {
                 editNoteMenuItem { openNoteEditorForStart(st) }
                 deleteMenuItem(for: brick)
             }
+        case .delay(let d):
+            DelayBrickView(
+                data: d,
+                onEditNoteTapped: { openNoteEditorForDelay(d) }
+            )
+            .wiringOverlay(id: d.id, wiring: wiring) { tappedBrick(d.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForDelay(d) }
+                Menu("Delay seconds") {
+                    ForEach(0...9, id: \.self) { v in
+                        Button("\(v + 1)s (display \(v))") {
+                            d.displayValue = v
+                            d.updatedDate = Date()
+                        }
+                    }
+                }
+                deleteMenuItem(for: brick)
+            }
         }
     }
 
@@ -403,6 +427,18 @@ struct GanttCanvasView: View {
         )
     }
 
+    private func openNoteEditorForDelay(_ delay: DelayBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: delay.id,
+            title: delay.notation.isEmpty ? "Delay" : delay.notation,
+            initialNote: delay.note,
+            onSave: { newNote in
+                delay.note = newNote
+                delay.updatedDate = Date()
+            }
+        )
+    }
+
     /// Right-click / long-press context menu items for a card.
     /// Includes Move Up/Down/Left/Right + Delete (Michael caught
     /// both the missing delete and missing move 2026-05-19).
@@ -457,6 +493,10 @@ struct GanttCanvasView: View {
             st.order = max(0, st.order + delta.row)
             st.column = max(0, st.column + delta.column)
             st.updatedDate = Date()
+        case .delay(let d):
+            d.order = max(0, d.order + delta.row)
+            d.column = max(0, d.column + delta.column)
+            d.updatedDate = Date()
         }
     }
 
@@ -467,6 +507,7 @@ struct GanttCanvasView: View {
         case .gate(let g):         modelContext.delete(g)
         case .supplemental(let s): modelContext.delete(s)
         case .start(let st):       modelContext.delete(st)
+        case .delay(let d):        modelContext.delete(d)
         }
     }
 
@@ -935,6 +976,19 @@ struct GanttCanvasView: View {
             guard existingStart == nil else { return false }
             let new = StartBrickData(
                 notation: "Start",
+                order: row,
+                column: column,
+                ganttChartId: chartId
+            )
+            modelContext.insert(new)
+            return true
+
+        case .delay:
+            // 1×1 Delay module (Master Design Spec 18.4). Default
+            // displayValue = 5 (held seconds = 6). User adjusts via
+            // the long-press / right-click context menu.
+            let new = DelayBrickData(
+                notation: "Delay",
                 order: row,
                 column: column,
                 ganttChartId: chartId
