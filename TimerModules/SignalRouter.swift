@@ -155,6 +155,25 @@ enum SignalRouter {
         propagate(from: start.id, in: chartId, runId: runId, in: context)
     }
 
+    /// Re-arm every Start module in the chart so the user can tap
+    /// it again to begin a new run. Locked design Part I §2.5: Start
+    /// is re-armed whenever the program terminates (End reached,
+    /// all flows complete, Trigger→End, or legacy Stop pressed).
+    /// Helper used by both endBrickReached (per .endBrick case in
+    /// handleSupplementalSignal) and stopAllRunningTimers (the
+    /// legacy toolbar Stop path, removed by Phase 8.3).
+    static func rearmStartModules(chartId: UUID, in context: ModelContext) {
+        let starts = (try? context.fetch(
+            FetchDescriptor<StartBrickData>(
+                predicate: #Predicate { $0.ganttChartId == chartId }
+            )
+        )) ?? []
+        for start in starts where start.hasFired {
+            start.hasFired = false
+            start.updatedDate = Date()
+        }
+    }
+
     /// Halts every running timer in the chart, accumulating their
     /// elapsed time. Called when the user presses Stop so the
     /// program ending also stops the individual timers — otherwise
@@ -168,6 +187,10 @@ enum SignalRouter {
         // the next Start and the first incoming signal is treated as
         // a halt (Michael 2026-05-20).
         runningLoops[chartId] = nil
+
+        // Re-arm any Start modules so the user can tap them to
+        // begin a new run after stopping (locked design Part I §2.5).
+        rearmStartModules(chartId: chartId, in: context)
 
         let runningTimers = (try? context.fetch(
             FetchDescriptor<TimerModuleData>(
@@ -529,7 +552,7 @@ enum SignalRouter {
         switch sup.brickType {
         case .endBrick:
             // Program flow reached an End brick — terminate the run.
-            // Halt running timers, end the heartbeat, log it.
+            // Halt running timers, end the heartbeat, log it, re-arm Start.
             stopAllRunningTimers(chartId: chartId, in: context)
             runners[chartId]?.stopByEndBrick(in: context)
             log(
@@ -542,6 +565,7 @@ enum SignalRouter {
                 noteIfAny: sup.note,
                 in: context
             )
+            rearmStartModules(chartId: chartId, in: context)
 
         case .action:
             log(
