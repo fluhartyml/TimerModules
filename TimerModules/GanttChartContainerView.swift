@@ -83,28 +83,26 @@ struct GanttChartContainerView: View {
                 .buttonStyle(.plain)
             }
 
-            ToolbarItemGroup(placement: .primaryAction) {
-                columnStepper
+            // HEARTBEAT INDICATOR — read-only visual chrome that
+            // replaces the previous ProgramToggleButton per Phase 8.3
+            // (Master Design Spec 5.1 + 5.20). The program starts via
+            // a Start module tap on the canvas (Phase 1.2 wired this
+            // to SignalRouter.fireProgramFromStart) and ends via an
+            // End module receiving a trace (Phase 1.3 re-arms Start
+            // on termination). No toolbar tap action — the indicator
+            // is pure chrome and not interactive.
+            ToolbarItem(placement: .primaryAction) {
                 if let runner = runner {
-                    ProgramToggleButton(
-                        runner: runner,
-                        onStart: {
-                            SignalRouter.startProgram(chartId: chart.id, in: modelContext)
-                        },
-                        onStop: {
-                            // Halt all running timers in the chart so they
-                            // don't keep counting in the background after
-                            // the program state is "stopped" (Michael
-                            // caught this bug 2026-05-19).
-                            SignalRouter.stopAllRunningTimers(chartId: chart.id, in: modelContext)
-                            runner.stopByUser(in: modelContext)
-                            presentLog()
-                        },
-                        onReset: {
-                            runner.reset()
-                        }
-                    )
+                    HeartbeatIndicatorView(runner: runner)
                 }
+            }
+
+            // Secondary actions — column stepper + Log. These can
+            // collapse into the overflow menu on narrow iPhones
+            // ("the colums is not as important") while the heartbeat
+            // indicator above stays visible.
+            ToolbarItemGroup(placement: .secondaryAction) {
+                columnStepper
                 Button {
                     presentLog()
                 } label: {
