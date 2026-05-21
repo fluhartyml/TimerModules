@@ -120,6 +120,41 @@ enum SignalRouter {
         propagate(from: trigger.id, in: chartId, runId: runId, in: context)
     }
 
+    /// Called when the user taps a Start module on the canvas.
+    /// Locked design Part I §2: Start is the chart's singular entry
+    /// point. Tapping it begins the program run + fires its outgoing
+    /// trace into the cascade. One-shot per program run (StartBrickView
+    /// guards subsequent taps via the data.hasFired flag); Start
+    /// re-arms when the program terminates (Phase 1.3 / Phase 2 work).
+    ///
+    /// Coexists with the legacy row-0 startProgram during the
+    /// transition; Phase 2 deletes the row-0 path.
+    static func fireProgramFromStart(
+        _ start: StartBrickData,
+        in context: ModelContext
+    ) {
+        guard let chartId = start.ganttChartId else { return }
+
+        // Kick the heartbeat — the runner logs its own programStarted
+        // entry. The start-level event below records WHICH Start
+        // module initiated the run (and carries its note).
+        let runId = runners[chartId]?.start(in: context) ?? UUID()
+        resetRuntimeState(chartId: chartId)
+
+        log(
+            eventType: "programStarted",
+            brickId: start.id,
+            brickTypeRaw: BrickType.start.rawValue,
+            brickNotation: start.notation.isEmpty ? "Start" : start.notation,
+            ganttChartId: chartId,
+            runId: runId,
+            noteIfAny: start.note,
+            in: context
+        )
+
+        propagate(from: start.id, in: chartId, runId: runId, in: context)
+    }
+
     /// Halts every running timer in the chart, accumulating their
     /// elapsed time. Called when the user presses Stop so the
     /// program ending also stops the individual timers — otherwise

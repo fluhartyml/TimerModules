@@ -330,7 +330,9 @@ struct GanttCanvasView: View {
             StartBrickView(
                 data: st,
                 onEditNoteTapped: { openNoteEditorForStart(st) },
-                onStartTapped: { /* SignalRouter wiring lands in Phase 1.2 */ }
+                onStartTapped: {
+                    SignalRouter.fireProgramFromStart(st, in: modelContext)
+                }
             )
             .wiringOverlay(id: st.id, wiring: wiring) { tappedBrick(st.id) }
             .contextMenu {
