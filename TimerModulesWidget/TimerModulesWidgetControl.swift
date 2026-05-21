@@ -10,7 +10,7 @@ import SwiftUI
 import WidgetKit
 
 struct TimerModulesWidgetControl: ControlWidget {
-    static let kind: String = "com.nightgard.TimerModules.TimerModulesWidget"
+    static let kind: String = "com.nightgard.timermodules.TimerModulesWidget"
 
     var body: some ControlWidgetConfiguration {
         AppIntentControlConfiguration(
