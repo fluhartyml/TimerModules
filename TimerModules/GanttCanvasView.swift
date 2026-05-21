@@ -43,6 +43,7 @@ struct GanttCanvasView: View {
     @Query private var textLCDs:      [TextLCDBrickData]
     @Query private var glyphLCDs:     [GlyphLCDBrickData]
     @Query private var digitalClocks: [DigitalClockBrickData]
+    @Query private var calendarDates: [CalendarDateBrickData]
 
     @State private var brickFrames: [UUID: CGRect] = [:]
     @State private var dropTargetedRow: Int? = nil
@@ -109,6 +110,7 @@ struct GanttCanvasView: View {
         case textLCD(TextLCDBrickData)
         case glyphLCD(GlyphLCDBrickData)
         case digitalClock(DigitalClockBrickData)
+        case calendarDate(CalendarDateBrickData)
 
         var id: UUID {
             switch self {
@@ -120,6 +122,7 @@ struct GanttCanvasView: View {
             case .textLCD(let l):         return l.id
             case .glyphLCD(let gl):       return gl.id
             case .digitalClock(let dc):   return dc.id
+            case .calendarDate(let cd):   return cd.id
             }
         }
 
@@ -133,6 +136,7 @@ struct GanttCanvasView: View {
             case .textLCD(let l):         return l.order
             case .glyphLCD(let gl):       return gl.order
             case .digitalClock(let dc):   return dc.order
+            case .calendarDate(let cd):   return cd.order
             }
         }
 
@@ -146,6 +150,7 @@ struct GanttCanvasView: View {
             case .textLCD(let l):         return l.column
             case .glyphLCD(let gl):       return gl.column
             case .digitalClock(let dc):   return dc.column
+            case .calendarDate(let cd):   return cd.column
             }
         }
     }
@@ -159,7 +164,8 @@ struct GanttCanvasView: View {
         let lc  = textLCDs.map      { CanvasBrick.textLCD($0) }
         let glc = glyphLCDs.map     { CanvasBrick.glyphLCD($0) }
         let dc  = digitalClocks.map { CanvasBrick.digitalClock($0) }
-        return t + g + s + st + d + lc + glc + dc
+        let cd  = calendarDates.map { CanvasBrick.calendarDate($0) }
+        return t + g + s + st + d + lc + glc + dc + cd
     }
 
     /// Bricks grouped by row, with each row's bricks sorted by column.
@@ -421,6 +427,21 @@ struct GanttCanvasView: View {
                 }
                 deleteMenuItem(for: brick)
             }
+        case .calendarDate(let cd):
+            CalendarDateBrickView(
+                data: cd,
+                onEditNoteTapped: { openNoteEditorForCalendarDate(cd) }
+            )
+            .wiringOverlay(id: cd.id, wiring: wiring) { tappedBrick(cd.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForCalendarDate(cd) }
+                Menu("Date format") {
+                    Button("MMM d EEE — May 21 Thu") { cd.formatStyleRaw = 0; cd.updatedDate = Date() }
+                    Button("M/d/yy — 5/21/26") { cd.formatStyleRaw = 1; cd.updatedDate = Date() }
+                    Button("EEE MMM d — Thu May 21") { cd.formatStyleRaw = 2; cd.updatedDate = Date() }
+                }
+                deleteMenuItem(for: brick)
+            }
         }
     }
 
@@ -593,6 +614,18 @@ struct GanttCanvasView: View {
         )
     }
 
+    private func openNoteEditorForCalendarDate(_ cd: CalendarDateBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: cd.id,
+            title: cd.notation.isEmpty ? "Date" : cd.notation,
+            initialNote: cd.note,
+            onSave: { newNote in
+                cd.note = newNote
+                cd.updatedDate = Date()
+            }
+        )
+    }
+
     /// Right-click / long-press context menu items for a card.
     /// Includes Move Up/Down/Left/Right + Delete (Michael caught
     /// both the missing delete and missing move 2026-05-19).
@@ -663,6 +696,10 @@ struct GanttCanvasView: View {
             dc.order = max(0, dc.order + delta.row)
             dc.column = max(0, dc.column + delta.column)
             dc.updatedDate = Date()
+        case .calendarDate(let cd):
+            cd.order = max(0, cd.order + delta.row)
+            cd.column = max(0, cd.column + delta.column)
+            cd.updatedDate = Date()
         }
     }
 
@@ -677,6 +714,7 @@ struct GanttCanvasView: View {
         case .textLCD(let l):        modelContext.delete(l)
         case .glyphLCD(let gl):      modelContext.delete(gl)
         case .digitalClock(let dc):  modelContext.delete(dc)
+        case .calendarDate(let cd):  modelContext.delete(cd)
         }
     }
 
@@ -1196,6 +1234,19 @@ struct GanttCanvasView: View {
             // (toggle via long-press / right-click).
             let new = DigitalClockBrickData(
                 notation: "Clock",
+                order: row,
+                column: column,
+                ganttChartId: chartId
+            )
+            modelContext.insert(new)
+            return true
+
+        case .calendarDate:
+            // 2×1 passive Calendar Date module (Master Design Spec
+            // 12.10). Shows current system date. Defaults to
+            // "May 21 Thu" format.
+            let new = CalendarDateBrickData(
+                notation: "Date",
                 order: row,
                 column: column,
                 ganttChartId: chartId
