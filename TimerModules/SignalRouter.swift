@@ -218,61 +218,28 @@ enum SignalRouter {
         }
     }
 
-    /// Called when the toolbar Start button is pressed. Starts the
-    /// chart's heartbeat runner, then fires every brick on row 0
-    /// as the program's entry-point set (Michael 2026-05-19 — row
-    /// 0 is the natural entry point; Trigger bricks are explicit
-    /// named entry points but not the only way to start a program).
+    /// Called when the legacy toolbar Start button is pressed.
+    /// Starts the chart's heartbeat runner and resets runtime state.
+    ///
+    /// HARD STOP (Master Design Spec 9.1 + 21.3): row-0 implicit
+    /// firing has been deleted. The program no longer auto-fires
+    /// every brick on row 0 as an entry-point set. Traces are the
+    /// ONLY execution driver. The user starts a program by tapping
+    /// a Start module on the canvas (which calls
+    /// fireProgramFromStart(_:in:) above) or a Trigger wired into
+    /// the chart (which calls fireProgram(from:in:)).
+    ///
+    /// This method is kept as a no-op-plus-heartbeat shim for the
+    /// legacy toolbar Start button until Phase 8.3 removes that
+    /// button entirely. After 8.3 ships, this method can be deleted.
     static func startProgram(chartId: UUID, in context: ModelContext) {
         guard let runner = runners[chartId] else { return }
-        let runId = runner.start(in: context)
+        _ = runner.start(in: context)
         resetRuntimeState(chartId: chartId)
-
-        let row0Timers = (try? context.fetch(
-            FetchDescriptor<TimerModuleData>(
-                predicate: #Predicate { $0.ganttChartId == chartId && $0.order == 0 }
-            )
-        )) ?? []
-        let row0Sups = (try? context.fetch(
-            FetchDescriptor<SupplementalBrickData>(
-                predicate: #Predicate { $0.ganttChartId == chartId && $0.order == 0 }
-            )
-        )) ?? []
-
-        for timer in row0Timers {
-            timer.runningSince = Date()
-            timer.updatedDate = Date()
-            log(
-                eventType: "timerStarted",
-                brickId: timer.id,
-                brickTypeRaw: BrickType.timerModule.rawValue,
-                brickNotation: timer.notation,
-                ganttChartId: chartId,
-                runId: runId,
-                noteIfAny: timer.note,
-                in: context
-            )
-            propagate(from: timer.id, in: chartId, runId: runId, in: context)
-        }
-
-        for sup in row0Sups {
-            // Loops must NEVER be fired as a row-0 entry point —
-            // doing so calls handleLoopSignal which interprets the
-            // event as "first signal received," starting the loop
-            // a second time when its real start signal (e.g. an
-            // incoming trace from Workday) has ALREADY started it.
-            // The second call then sets haltRequested = true,
-            // killing the run after one body iteration. (Michael
-            // 2026-05-20 — phantom "Loop Halt Requested" at
-            // 21:08:41 confirmed via LogView.) Loops only start
-            // via incoming traces.
-            if sup.brickType == .loop {
-                continue
-            }
-
-            handleSupplementalSignal(sup, runId: runId, in: context)
-            propagate(from: sup.id, in: chartId, runId: runId, in: context)
-        }
+        // No row-0 firing. Charts without a Start module on the
+        // canvas are dormant (Master Design Spec 2.8); the toolbar
+        // press just primes the heartbeat in case the user is about
+        // to tap a Start or Trigger on the canvas.
     }
 
     /// Called when a Timer brick completes (countdown reached 0
@@ -308,90 +275,15 @@ enum SignalRouter {
 
         propagate(from: timer.id, in: chartId, runId: runId, in: context)
 
-        // Row-barrier default flow: if this completion makes the
-        // timer's row entirely done (no more running or unstarted
-        // timers in the row), auto-fire every brick in the next
-        // row (Michael 2026-05-19, M5.7).
-        advanceRowIfRowComplete(
-            chartId: chartId,
-            completedRow: timer.order,
-            runId: runId,
-            in: context
-        )
-    }
-
-    /// Checks whether every timer in the given row has completed.
-    /// If so, fires every brick in the next row (timers get
-    /// runningSince = now; supplementals run their side effects).
-    /// This is the row-barrier default-flow advance described in
-    /// the M5.7 design conversation.
-    private static func advanceRowIfRowComplete(
-        chartId: UUID,
-        completedRow: Int,
-        runId: UUID,
-        in context: ModelContext
-    ) {
-        let timersInRow = (try? context.fetch(
-            FetchDescriptor<TimerModuleData>(
-                predicate: #Predicate { $0.ganttChartId == chartId && $0.order == completedRow }
-            )
-        )) ?? []
-
-        // Row is complete if every timer in it has been started
-        // (accumulatedSeconds > 0) and is not currently running.
-        let allDone = timersInRow.allSatisfy { t in
-            t.runningSince == nil && t.accumulatedSeconds > 0
-        }
-        guard !timersInRow.isEmpty, allDone else { return }
-
-        let nextRow = completedRow + 1
-        let nextRowTimers = (try? context.fetch(
-            FetchDescriptor<TimerModuleData>(
-                predicate: #Predicate { $0.ganttChartId == chartId && $0.order == nextRow }
-            )
-        )) ?? []
-        let nextRowSups = (try? context.fetch(
-            FetchDescriptor<SupplementalBrickData>(
-                predicate: #Predicate { $0.ganttChartId == chartId && $0.order == nextRow }
-            )
-        )) ?? []
-
-        guard !nextRowTimers.isEmpty || !nextRowSups.isEmpty else {
-            // No next row — program runs out the bottom. Heartbeat
-            // keeps running until the user presses Stop or hits an
-            // End brick (already handled).
-            return
-        }
-
-        log(
-            eventType: "rowAdvanced",
-            brickId: nil,
-            brickTypeRaw: "",
-            brickNotation: "row \(completedRow) → row \(nextRow)",
-            ganttChartId: chartId,
-            runId: runId,
-            in: context
-        )
-
-        for t in nextRowTimers {
-            t.runningSince = Date()
-            t.updatedDate = Date()
-            log(
-                eventType: "timerStarted",
-                brickId: t.id,
-                brickTypeRaw: BrickType.timerModule.rawValue,
-                brickNotation: t.notation,
-                ganttChartId: chartId,
-                runId: runId,
-                noteIfAny: t.note,
-                in: context
-            )
-            propagate(from: t.id, in: chartId, runId: runId, in: context)
-        }
-        for s in nextRowSups {
-            handleSupplementalSignal(s, runId: runId, in: context)
-            propagate(from: s.id, in: chartId, runId: runId, in: context)
-        }
+        // HARD STOP (Master Design Spec 9.1 + 21.3): the row-barrier
+        // auto-advance — formerly advanceRowIfRowComplete() called
+        // here — has been deleted. Traces are the ONLY execution
+        // driver. A timer's completion fires its outgoing traces via
+        // propagate() above; nothing else. Row position is layout
+        // only. Re-introducing row-barrier auto-advance would re-
+        // create the dual-execution-driver conflict that caused
+        // Pomerado Work and Break to run in parallel after Workday
+        // completed (the MAY 20 bug). Never bring it back.
     }
 
     // MARK: Propagation
