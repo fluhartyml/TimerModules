@@ -199,7 +199,17 @@ enum SignalRouter {
 
         for sup in row0Sups {
             handleSupplementalSignal(sup, runId: runId, in: context)
-            propagate(from: sup.id, in: chartId, runId: runId, in: context)
+            // Loops own their outgoing-trace timing — `exitLoop`
+            // fires `propagate` at the moment the loop actually
+            // exits (halt received + body iteration completed). If
+            // we propagate from a Loop here too, its downstream
+            // (e.g. End) fires immediately at program start before
+            // the loop has done any real work. (Michael 2026-05-20:
+            // "after i pressed start it went to stop and the log
+            // poped up.")
+            if sup.brickType != .loop {
+                propagate(from: sup.id, in: chartId, runId: runId, in: context)
+            }
         }
     }
 
