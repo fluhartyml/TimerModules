@@ -23,6 +23,7 @@ import CoreTransferable
 enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     // Functional
     case timerModule
+    case start    // 2026-05-21 — program entry module (Part I §2). Exactly one per chart, one-shot per run, re-arms on program termination. NOT to be confused with Trigger.
 
     // Logic-gate connectors
     case andGate
@@ -86,7 +87,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
 
     var family: Family {
         switch self {
-        case .timerModule:
+        case .timerModule, .start:
             return .functional
         case .andGate, .orGate, .notGate, .norGate, .nandGate, .xorGate, .xnorGate:
             return .logicGate
@@ -114,6 +115,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     var displayName: String {
         switch self {
         case .timerModule:  return "Timer"
+        case .start:        return "Start"
         case .andGate:      return "AND"
         case .orGate:       return "OR"
         case .notGate:      return "NOT"
@@ -147,6 +149,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     var symbolName: String? {
         switch self {
         case .timerModule:  return "timer"
+        case .start:        return "play.circle.fill"
         case .andGate, .orGate, .notGate, .norGate,
              .nandGate, .xorGate, .xnorGate:
             return nil  // uses textGlyph
@@ -190,7 +193,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     /// nine supplemental types.
     var isWiredUp: Bool {
         switch self {
-        case .timerModule,
+        case .timerModule, .start,
              .andGate, .orGate, .notGate, .norGate,
              .nandGate, .xorGate, .xnorGate,
              .trace,

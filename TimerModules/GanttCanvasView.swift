@@ -38,6 +38,7 @@ struct GanttCanvasView: View {
     @Query private var gates:         [GateBrickData]
     @Query private var traces:        [TraceData]
     @Query private var supplementals: [SupplementalBrickData]
+    @Query private var starts:        [StartBrickData]
 
     @State private var brickFrames: [UUID: CGRect] = [:]
     @State private var dropTargetedRow: Int? = nil
@@ -99,12 +100,14 @@ struct GanttCanvasView: View {
         case timer(TimerModuleData)
         case gate(GateBrickData)
         case supplemental(SupplementalBrickData)
+        case start(StartBrickData)
 
         var id: UUID {
             switch self {
             case .timer(let t):        return t.id
             case .gate(let g):         return g.id
             case .supplemental(let s): return s.id
+            case .start(let st):       return st.id
             }
         }
 
@@ -113,6 +116,7 @@ struct GanttCanvasView: View {
             case .timer(let t):        return t.order
             case .gate(let g):         return g.order
             case .supplemental(let s): return s.order
+            case .start(let st):       return st.order
             }
         }
 
@@ -121,15 +125,17 @@ struct GanttCanvasView: View {
             case .timer(let t):        return t.column
             case .gate(let g):         return g.column
             case .supplemental(let s): return s.column
+            case .start(let st):       return st.column
             }
         }
     }
 
     private var allBricks: [CanvasBrick] {
-        let t = timers.map        { CanvasBrick.timer($0) }
-        let g = gates.map         { CanvasBrick.gate($0) }
-        let s = supplementals.map { CanvasBrick.supplemental($0) }
-        return t + g + s
+        let t  = timers.map        { CanvasBrick.timer($0) }
+        let g  = gates.map         { CanvasBrick.gate($0) }
+        let s  = supplementals.map { CanvasBrick.supplemental($0) }
+        let st = starts.map        { CanvasBrick.start($0) }
+        return t + g + s + st
     }
 
     /// Bricks grouped by row, with each row's bricks sorted by column.
@@ -320,6 +326,17 @@ struct GanttCanvasView: View {
                 editNoteMenuItem { openNoteEditorForSupplemental(sup) }
                 deleteMenuItem(for: brick)
             }
+        case .start(let st):
+            StartBrickView(
+                data: st,
+                onEditNoteTapped: { openNoteEditorForStart(st) },
+                onStartTapped: { /* SignalRouter wiring lands in Phase 1.2 */ }
+            )
+            .wiringOverlay(id: st.id, wiring: wiring) { tappedBrick(st.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForStart(st) }
+                deleteMenuItem(for: brick)
+            }
         }
     }
 
@@ -368,6 +385,18 @@ struct GanttCanvasView: View {
             onSave: { newNote in
                 sup.note = newNote
                 sup.updatedDate = Date()
+            }
+        )
+    }
+
+    private func openNoteEditorForStart(_ start: StartBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: start.id,
+            title: start.notation.isEmpty ? "Start" : start.notation,
+            initialNote: start.note,
+            onSave: { newNote in
+                start.note = newNote
+                start.updatedDate = Date()
             }
         )
     }
@@ -422,6 +451,10 @@ struct GanttCanvasView: View {
             s.order = max(0, s.order + delta.row)
             s.column = max(0, s.column + delta.column)
             s.updatedDate = Date()
+        case .start(let st):
+            st.order = max(0, st.order + delta.row)
+            st.column = max(0, st.column + delta.column)
+            st.updatedDate = Date()
         }
     }
 
@@ -431,6 +464,7 @@ struct GanttCanvasView: View {
         case .timer(let t):        modelContext.delete(t)
         case .gate(let g):         modelContext.delete(g)
         case .supplemental(let s): modelContext.delete(s)
+        case .start(let st):       modelContext.delete(st)
         }
     }
 
@@ -885,6 +919,20 @@ struct GanttCanvasView: View {
         case .timerModule:
             let new = TimerModuleData(
                 notation: "Timer \(row + 1).\(column + 1)",
+                order: row,
+                column: column,
+                ganttChartId: chartId
+            )
+            modelContext.insert(new)
+            return true
+
+        case .start:
+            // Locked design (Part I § 2): exactly ONE Start per chart.
+            // Reject the drop if this chart already has one.
+            let existingStart = starts.first { $0.ganttChartId == chartId }
+            guard existingStart == nil else { return false }
+            let new = StartBrickData(
+                notation: "Start",
                 order: row,
                 column: column,
                 ganttChartId: chartId
