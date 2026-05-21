@@ -77,6 +77,20 @@ struct ProgramToggleButton: View {
     }
 
     // MARK: Running — pulsating Stop
+    //
+    // Heartbeat pulse driven directly off `runner.tick` (1 Hz).
+    // The background alternates between two distinct teal shades
+    // on each tick (Michael 2026-05-20: "alternate one minute tiel
+    // and the next minute a different shade of tiel back and forth
+    // per heartbeat") AND scales the capsule 1.0 ↔ 1.12 so there's
+    // both color and size feedback. Earlier the scale alone was too
+    // subtle to read as a pulse.
+
+    private var heartbeatTealA: Color { Color(red: 0.22, green: 0.72, blue: 0.74) }
+    private var heartbeatTealB: Color { Color(red: 0.08, green: 0.45, blue: 0.52) }
+    private var pulseTeal: Color {
+        runner.tick.isMultiple(of: 2) ? heartbeatTealA : heartbeatTealB
+    }
 
     private var runningButton: some View {
         Button {
@@ -90,15 +104,9 @@ struct ProgramToggleButton: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
-            .background(Capsule().fill(Color.accentColor))
-            .scaleEffect(pulseUp ? 1.08 : 1.0)
-            .animation(.easeInOut(duration: 0.5), value: pulseUp)
-            .onChange(of: runner.tick) { _, _ in
-                pulseUp.toggle()
-            }
-            .onAppear {
-                pulseUp.toggle()
-            }
+            .background(Capsule().fill(pulseTeal))
+            .scaleEffect(runner.tick.isMultiple(of: 2) ? 1.0 : 1.12)
+            .animation(.easeInOut(duration: 0.45), value: runner.tick)
         }
         .buttonStyle(.plain)
         .help("Stop the program (currently running)")

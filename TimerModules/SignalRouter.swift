@@ -198,18 +198,22 @@ enum SignalRouter {
         }
 
         for sup in row0Sups {
-            handleSupplementalSignal(sup, runId: runId, in: context)
-            // Loops own their outgoing-trace timing — `exitLoop`
-            // fires `propagate` at the moment the loop actually
-            // exits (halt received + body iteration completed). If
-            // we propagate from a Loop here too, its downstream
-            // (e.g. End) fires immediately at program start before
-            // the loop has done any real work. (Michael 2026-05-20:
-            // "after i pressed start it went to stop and the log
-            // poped up.")
-            if sup.brickType != .loop {
-                propagate(from: sup.id, in: chartId, runId: runId, in: context)
+            // Loops must NEVER be fired as a row-0 entry point —
+            // doing so calls handleLoopSignal which interprets the
+            // event as "first signal received," starting the loop
+            // a second time when its real start signal (e.g. an
+            // incoming trace from Workday) has ALREADY started it.
+            // The second call then sets haltRequested = true,
+            // killing the run after one body iteration. (Michael
+            // 2026-05-20 — phantom "Loop Halt Requested" at
+            // 21:08:41 confirmed via LogView.) Loops only start
+            // via incoming traces.
+            if sup.brickType == .loop {
+                continue
             }
+
+            handleSupplementalSignal(sup, runId: runId, in: context)
+            propagate(from: sup.id, in: chartId, runId: runId, in: context)
         }
     }
 
