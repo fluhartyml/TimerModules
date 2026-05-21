@@ -358,6 +358,42 @@ enum SignalRouter {
             handleTextLCDSignal(lcd, via: trace, runId: runId, in: context)
             return
         }
+        if let glcd = fetchOne(GlyphLCDBrickData.self, id: destId, chartId: chartId, in: context) {
+            handleGlyphLCDSignal(glcd, via: trace, runId: runId, in: context)
+            return
+        }
+    }
+
+    /// A trace fired into a Glyph LCD module — light up its cell N
+    /// per the trace's destinationPortIndex. LED light-bulb model
+    /// per Master Design Spec 19.7: only one cell lit at a time;
+    /// persists until another port fires.
+    private static func handleGlyphLCDSignal(
+        _ lcd: GlyphLCDBrickData,
+        via trace: TraceData,
+        runId: UUID,
+        in context: ModelContext
+    ) {
+        guard let chartId = lcd.ganttChartId else { return }
+
+        let port = max(0, min(GlyphLCDBrickData.portCount - 1, trace.destinationPortIndex))
+        lcd.currentPortIndex = port
+        lcd.updatedDate = Date()
+
+        let glyph = (port < lcd.glyphs.count) ? lcd.glyphs[port] : ""
+        log(
+            eventType: "glyphLCDCellLit",
+            brickId: lcd.id,
+            brickTypeRaw: BrickType.glyphLCD.rawValue,
+            brickNotation: lcd.notation.isEmpty ? "Glyph LCD" : lcd.notation,
+            ganttChartId: chartId,
+            payloadJSON: "{\"port\":\(port),\"glyph\":\"\(escape(glyph))\"}",
+            runId: runId,
+            noteIfAny: lcd.note,
+            in: context
+        )
+
+        // Glyph LCD is an output sink — no outgoing trace.
     }
 
     /// A trace fired into a Text LCD module — update the displayed

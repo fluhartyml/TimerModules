@@ -41,6 +41,7 @@ struct GanttCanvasView: View {
     @Query private var starts:        [StartBrickData]
     @Query private var delays:        [DelayBrickData]
     @Query private var textLCDs:      [TextLCDBrickData]
+    @Query private var glyphLCDs:     [GlyphLCDBrickData]
 
     @State private var brickFrames: [UUID: CGRect] = [:]
     @State private var dropTargetedRow: Int? = nil
@@ -105,6 +106,7 @@ struct GanttCanvasView: View {
         case start(StartBrickData)
         case delay(DelayBrickData)
         case textLCD(TextLCDBrickData)
+        case glyphLCD(GlyphLCDBrickData)
 
         var id: UUID {
             switch self {
@@ -114,6 +116,7 @@ struct GanttCanvasView: View {
             case .start(let st):       return st.id
             case .delay(let d):        return d.id
             case .textLCD(let l):      return l.id
+            case .glyphLCD(let gl):    return gl.id
             }
         }
 
@@ -125,6 +128,7 @@ struct GanttCanvasView: View {
             case .start(let st):       return st.order
             case .delay(let d):        return d.order
             case .textLCD(let l):      return l.order
+            case .glyphLCD(let gl):    return gl.order
             }
         }
 
@@ -136,18 +140,20 @@ struct GanttCanvasView: View {
             case .start(let st):       return st.column
             case .delay(let d):        return d.column
             case .textLCD(let l):      return l.column
+            case .glyphLCD(let gl):    return gl.column
             }
         }
     }
 
     private var allBricks: [CanvasBrick] {
-        let t  = timers.map        { CanvasBrick.timer($0) }
-        let g  = gates.map         { CanvasBrick.gate($0) }
-        let s  = supplementals.map { CanvasBrick.supplemental($0) }
-        let st = starts.map        { CanvasBrick.start($0) }
-        let d  = delays.map        { CanvasBrick.delay($0) }
-        let lc = textLCDs.map      { CanvasBrick.textLCD($0) }
-        return t + g + s + st + d + lc
+        let t   = timers.map        { CanvasBrick.timer($0) }
+        let g   = gates.map         { CanvasBrick.gate($0) }
+        let s   = supplementals.map { CanvasBrick.supplemental($0) }
+        let st  = starts.map        { CanvasBrick.start($0) }
+        let d   = delays.map        { CanvasBrick.delay($0) }
+        let lc  = textLCDs.map      { CanvasBrick.textLCD($0) }
+        let glc = glyphLCDs.map     { CanvasBrick.glyphLCD($0) }
+        return t + g + s + st + d + lc + glc
     }
 
     /// Bricks grouped by row, with each row's bricks sorted by column.
@@ -382,7 +388,46 @@ struct GanttCanvasView: View {
                 }
                 deleteMenuItem(for: brick)
             }
+        case .glyphLCD(let gl):
+            GlyphLCDBrickView(
+                data: gl,
+                onEditNoteTapped: { openNoteEditorForGlyphLCD(gl) }
+            )
+            .wiringOverlay(id: gl.id, wiring: wiring) { tappedBrick(gl.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForGlyphLCD(gl) }
+                Button("Edit glyphs…") {
+                    openGlyphsEditor(for: gl)
+                }
+                deleteMenuItem(for: brick)
+            }
         }
+    }
+
+    private func openGlyphsEditor(for lcd: GlyphLCDBrickData) {
+        let joined = lcd.glyphs.enumerated().map { idx, g in
+            "Port \(idx + 1): \(g)"
+        }.joined(separator: "\n")
+        noteEditorTarget = NoteEditorTarget(
+            id: lcd.id,
+            title: lcd.notation.isEmpty ? "Glyph LCD" : lcd.notation,
+            initialNote: joined,
+            onSave: { newJoined in
+                let lines = newJoined.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+                var glyphs: [String] = Array(repeating: "", count: GlyphLCDBrickData.portCount)
+                for (i, line) in lines.prefix(GlyphLCDBrickData.portCount).enumerated() {
+                    let trimmed: String
+                    if let colon = line.firstIndex(of: ":") {
+                        trimmed = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+                    } else {
+                        trimmed = line.trimmingCharacters(in: .whitespaces)
+                    }
+                    glyphs[i] = String(trimmed.prefix(GlyphLCDBrickData.charLimit))
+                }
+                lcd.glyphs = glyphs
+                lcd.updatedDate = Date()
+            }
+        )
     }
 
     private func openCannedMessagesEditor(for lcd: TextLCDBrickData) {
@@ -504,6 +549,18 @@ struct GanttCanvasView: View {
         )
     }
 
+    private func openNoteEditorForGlyphLCD(_ lcd: GlyphLCDBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: lcd.id,
+            title: lcd.notation.isEmpty ? "Glyph LCD" : lcd.notation,
+            initialNote: lcd.note,
+            onSave: { newNote in
+                lcd.note = newNote
+                lcd.updatedDate = Date()
+            }
+        )
+    }
+
     /// Right-click / long-press context menu items for a card.
     /// Includes Move Up/Down/Left/Right + Delete (Michael caught
     /// both the missing delete and missing move 2026-05-19).
@@ -566,6 +623,10 @@ struct GanttCanvasView: View {
             l.order = max(0, l.order + delta.row)
             l.column = max(0, l.column + delta.column)
             l.updatedDate = Date()
+        case .glyphLCD(let gl):
+            gl.order = max(0, gl.order + delta.row)
+            gl.column = max(0, gl.column + delta.column)
+            gl.updatedDate = Date()
         }
     }
 
@@ -578,6 +639,7 @@ struct GanttCanvasView: View {
         case .start(let st):       modelContext.delete(st)
         case .delay(let d):        modelContext.delete(d)
         case .textLCD(let l):      modelContext.delete(l)
+        case .glyphLCD(let gl):    modelContext.delete(gl)
         }
     }
 
@@ -1072,6 +1134,18 @@ struct GanttCanvasView: View {
             // menu's "Edit canned messages…".
             let new = TextLCDBrickData(
                 notation: "Text LCD",
+                order: row,
+                column: column,
+                ganttChartId: chartId
+            )
+            modelContext.insert(new)
+            return true
+
+        case .glyphLCD:
+            // 1×4 Glyph LCD module (Master Design Spec 19). Default
+            // glyphs are common SF Symbols; user edits via "Edit glyphs…".
+            let new = GlyphLCDBrickData(
+                notation: "Glyph LCD",
                 order: row,
                 column: column,
                 ganttChartId: chartId

@@ -26,6 +26,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     case start    // 2026-05-21 — program entry module (Part I §2). Exactly one per chart, one-shot per run, re-arms on program termination. NOT to be confused with Trigger.
     case delay    // 2026-05-21 — 1×1 cascade-spacing waypoint (Part II §18). Display 0-9 = ten seconds max per module. Compose in series for longer waits. 7-segment crosswalk countdown when in flight.
     case textLCD  // 2026-05-21 — 4×1 horizontal runtime output (Part II §19). 4 input ports, each with a 22-char canned message; persistent e-ink display.
+    case glyphLCD // 2026-05-21 — 1×4 vertical runtime output (Part II §19). 4 input ports, each with a glyph; LED light-bulb model (one lit at a time).
 
     // Logic-gate connectors
     case andGate
@@ -89,7 +90,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
 
     var family: Family {
         switch self {
-        case .timerModule, .start, .delay, .textLCD:
+        case .timerModule, .start, .delay, .textLCD, .glyphLCD:
             return .functional
         case .andGate, .orGate, .notGate, .norGate, .nandGate, .xorGate, .xnorGate:
             return .logicGate
@@ -120,6 +121,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         case .start:        return "Start"
         case .delay:        return "Delay"
         case .textLCD:      return "Text LCD"
+        case .glyphLCD:     return "Glyph LCD"
         case .andGate:      return "AND"
         case .orGate:       return "OR"
         case .notGate:      return "NOT"
@@ -156,6 +158,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         case .start:        return "play.circle.fill"
         case .delay:        return "hourglass"
         case .textLCD:      return "text.viewfinder"
+        case .glyphLCD:     return "square.grid.4x3.fill"
         case .andGate, .orGate, .notGate, .norGate,
              .nandGate, .xorGate, .xnorGate:
             return nil  // uses textGlyph
@@ -199,7 +202,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     /// nine supplemental types.
     var isWiredUp: Bool {
         switch self {
-        case .timerModule, .start, .delay, .textLCD,
+        case .timerModule, .start, .delay, .textLCD, .glyphLCD,
              .andGate, .orGate, .notGate, .norGate,
              .nandGate, .xorGate, .xnorGate,
              .trace,
