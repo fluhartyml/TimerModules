@@ -140,6 +140,9 @@ enum SignalRouter {
         // module initiated the run (and carries its note).
         let runId = runners[chartId]?.start(in: context) ?? UUID()
         resetRuntimeState(chartId: chartId)
+        // Re-arm Note modules so their last-page-reached output can
+        // fire again on this run per Master Design Spec 22.7.5a.
+        resetNotesForRun(chartId: chartId, in: context)
 
         log(
             eventType: "programStarted",
@@ -153,6 +156,57 @@ enum SignalRouter {
         )
 
         propagate(from: start.id, in: chartId, runId: runId, in: context)
+    }
+
+    /// Note module reached its last page during a running program.
+    /// Called from the view layer when the user swipes to the final
+    /// page. Fires the Note's outgoing trace ONCE per program run
+    /// (Master Design Spec 22.7.5a — fire-once semantics, resets on
+    /// Start). After firing, sets lastPageReachedFiredThisRun = true
+    /// to suppress re-fire on re-swipe-to-end.
+    static func fireNoteLastPageReached(
+        _ note: NoteModuleBrickData,
+        in context: ModelContext
+    ) {
+        guard let chartId = note.ganttChartId else { return }
+        guard let runner = runners[chartId] else { return }
+        // Only fires while the program is actively running. If the
+        // user is just thumbing through the Note while the chart is
+        // idle, no trace fires.
+        guard runner.isRunning else { return }
+        guard !note.lastPageReachedFiredThisRun else { return }
+
+        note.lastPageReachedFiredThisRun = true
+        note.updatedDate = Date()
+
+        let runId = currentRunId(for: chartId)
+        log(
+            eventType: "noteLastPageReached",
+            brickId: note.id,
+            brickTypeRaw: BrickType.noteModule.rawValue,
+            brickNotation: note.notation.isEmpty ? "Note" : note.notation,
+            ganttChartId: chartId,
+            runId: runId,
+            noteIfAny: note.note,
+            in: context
+        )
+
+        propagate(from: note.id, in: chartId, runId: runId, in: context)
+    }
+
+    /// Reset all Note modules in a chart so their last-page-reached
+    /// output can fire again on the next program run. Called from
+    /// fireProgramFromStart so the Start tap re-arms Notes too.
+    private static func resetNotesForRun(chartId: UUID, in context: ModelContext) {
+        let notes = (try? context.fetch(
+            FetchDescriptor<NoteModuleBrickData>(
+                predicate: #Predicate { $0.ganttChartId == chartId }
+            )
+        )) ?? []
+        for n in notes where n.lastPageReachedFiredThisRun {
+            n.lastPageReachedFiredThisRun = false
+            n.updatedDate = Date()
+        }
     }
 
     /// Re-arm every Start module in the chart so the user can tap

@@ -45,6 +45,7 @@ struct GanttCanvasView: View {
     @Query private var digitalClocks: [DigitalClockBrickData]
     @Query private var calendarDates: [CalendarDateBrickData]
     @Query private var batteries:     [BatteryBrickData]
+    @Query private var noteModules:   [NoteModuleBrickData]
 
     @State private var brickFrames: [UUID: CGRect] = [:]
     @State private var dropTargetedRow: Int? = nil
@@ -113,6 +114,7 @@ struct GanttCanvasView: View {
         case digitalClock(DigitalClockBrickData)
         case calendarDate(CalendarDateBrickData)
         case battery(BatteryBrickData)
+        case noteModule(NoteModuleBrickData)
 
         var id: UUID {
             switch self {
@@ -126,6 +128,7 @@ struct GanttCanvasView: View {
             case .digitalClock(let dc):   return dc.id
             case .calendarDate(let cd):   return cd.id
             case .battery(let b):         return b.id
+            case .noteModule(let n):      return n.id
             }
         }
 
@@ -141,6 +144,7 @@ struct GanttCanvasView: View {
             case .digitalClock(let dc):   return dc.order
             case .calendarDate(let cd):   return cd.order
             case .battery(let b):         return b.order
+            case .noteModule(let n):      return n.order
             }
         }
 
@@ -156,6 +160,7 @@ struct GanttCanvasView: View {
             case .digitalClock(let dc):   return dc.column
             case .calendarDate(let cd):   return cd.column
             case .battery(let b):         return b.column
+            case .noteModule(let n):      return n.column
             }
         }
     }
@@ -171,7 +176,8 @@ struct GanttCanvasView: View {
         let dc  = digitalClocks.map { CanvasBrick.digitalClock($0) }
         let cd  = calendarDates.map { CanvasBrick.calendarDate($0) }
         let bt  = batteries.map     { CanvasBrick.battery($0) }
-        return t + g + s + st + d + lc + glc + dc + cd + bt
+        let nm  = noteModules.map   { CanvasBrick.noteModule($0) }
+        return t + g + s + st + d + lc + glc + dc + cd + bt + nm
     }
 
     /// Bricks grouped by row, with each row's bricks sorted by column.
@@ -458,7 +464,54 @@ struct GanttCanvasView: View {
                 editNoteMenuItem { openNoteEditorForBattery(b) }
                 deleteMenuItem(for: brick)
             }
+        case .noteModule(let n):
+            NoteModuleBrickView(
+                data: n,
+                onEditNoteTapped: { openNoteEditorForNoteModule(n) },
+                onPageEditTapped: { idx in
+                    openNotePageEditor(for: n, pageIndex: idx)
+                },
+                onLastPageReached: {
+                    SignalRouter.fireNoteLastPageReached(n, in: modelContext)
+                }
+            )
+            .wiringOverlay(id: n.id, wiring: wiring) { tappedBrick(n.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForNoteModule(n) }
+                Button("Add page") {
+                    if n.pages.count < NoteModuleBrickData.maxPages {
+                        n.pages.append("")
+                        n.updatedDate = Date()
+                    }
+                }
+                Button("Remove last page") {
+                    if n.pages.count > 1 {
+                        n.pages.removeLast()
+                        n.currentPageIndex = min(n.currentPageIndex, n.pages.count - 1)
+                        n.updatedDate = Date()
+                    }
+                }
+                Button("Edit current page…") {
+                    openNotePageEditor(for: n, pageIndex: n.currentPageIndex)
+                }
+                deleteMenuItem(for: brick)
+            }
         }
+    }
+
+    private func openNotePageEditor(for note: NoteModuleBrickData, pageIndex: Int) {
+        let safeIndex = max(0, min(note.pages.count - 1, pageIndex))
+        noteEditorTarget = NoteEditorTarget(
+            id: note.id,
+            title: "Page \(safeIndex + 1) of \(note.pages.count)",
+            initialNote: note.pages[safeIndex],
+            onSave: { newText in
+                var pages = note.pages
+                pages[safeIndex] = String(newText.prefix(NoteModuleBrickData.charLimitPerPage))
+                note.pages = pages
+                note.updatedDate = Date()
+            }
+        )
     }
 
     private func openGlyphsEditor(for lcd: GlyphLCDBrickData) {
@@ -654,6 +707,18 @@ struct GanttCanvasView: View {
         )
     }
 
+    private func openNoteEditorForNoteModule(_ note: NoteModuleBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: note.id,
+            title: note.notation.isEmpty ? "Note" : note.notation,
+            initialNote: note.note,
+            onSave: { newNote in
+                note.note = newNote
+                note.updatedDate = Date()
+            }
+        )
+    }
+
     /// Right-click / long-press context menu items for a card.
     /// Includes Move Up/Down/Left/Right + Delete (Michael caught
     /// both the missing delete and missing move 2026-05-19).
@@ -732,6 +797,10 @@ struct GanttCanvasView: View {
             b.order = max(0, b.order + delta.row)
             b.column = max(0, b.column + delta.column)
             b.updatedDate = Date()
+        case .noteModule(let n):
+            n.order = max(0, n.order + delta.row)
+            n.column = max(0, n.column + delta.column)
+            n.updatedDate = Date()
         }
     }
 
@@ -748,6 +817,7 @@ struct GanttCanvasView: View {
         case .digitalClock(let dc):  modelContext.delete(dc)
         case .calendarDate(let cd):  modelContext.delete(cd)
         case .battery(let b):        modelContext.delete(b)
+        case .noteModule(let n):     modelContext.delete(n)
         }
     }
 
@@ -1292,6 +1362,19 @@ struct GanttCanvasView: View {
             // Battery % on iOS/iPad; "AC" on Mac per the v1.0 shim.
             let new = BatteryBrickData(
                 notation: "Battery",
+                order: row,
+                column: column,
+                ganttChartId: chartId
+            )
+            modelContext.insert(new)
+            return true
+
+        case .noteModule:
+            // 4×4 Note module with Smart Stack of swipable pages
+            // (Master Design Spec 22.7). Starts with one blank page;
+            // user adds more via context menu.
+            let new = NoteModuleBrickData(
+                notation: "Note",
                 order: row,
                 column: column,
                 ganttChartId: chartId
