@@ -13,6 +13,9 @@
 
 import Foundation
 import SwiftData
+#if os(iOS) || os(visionOS)
+import ActivityKit
+#endif
 import UserNotifications
 import AVFoundation
 #if canImport(UIKit)
@@ -317,6 +320,8 @@ enum SignalRouter {
             noteIfAny: timer.note,
             in: context
         )
+
+        completeLiveActivity(for: timer)
 
         // If this timer is in a running Loop's body, let the loop
         // tick its pending-set so it can iterate or exit.
@@ -639,6 +644,7 @@ enum SignalRouter {
                 noteIfAny: timer.note,
                 in: context
             )
+            startLiveActivity(for: timer, chartId: chartId, in: context)
         default:
             break
         }
@@ -1098,5 +1104,98 @@ enum SignalRouter {
             )
             context.insert(noteEntry)
         }
+    }
+
+    // MARK: - Live Activity (iOS-only)
+    //
+    // Called by handleTimerSignal when a Timer starts, and by
+    // fireTimerCompletion when a Timer completes. Starts / ends a
+    // Lock Screen + Dynamic Island Live Activity showing the active
+    // Timer's countdown. iOS-only — on Mac these are no-ops.
+
+    #if os(iOS) || os(visionOS)
+    /// Map of timer-id → running Activity, so completion can locate
+    /// the activity to end. Activities are keyed by Timer id rather
+    /// than chart id since one chart can have multiple concurrent
+    /// timers running (and thus multiple Live Activities).
+    @available(iOS 16.1, *)
+    private static var activitiesByTimerId: [UUID: Activity<TimerModulesActivityAttributes>] = [:]
+    #endif
+
+    static func startLiveActivity(
+        for timer: TimerModuleData,
+        chartId: UUID,
+        in context: ModelContext
+    ) {
+        #if os(iOS) || os(visionOS)
+        guard #available(iOS 16.2, *) else { return }
+        // Only start Live Activities for countdown timers (count-up
+        // timers have no end date for the system to render against).
+        guard timer.mode == .countdown else { return }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        // Find chart name for the Activity's fixed attributes.
+        let chartName: String = {
+            let charts = (try? context.fetch(
+                FetchDescriptor<GanttChartData>(
+                    predicate: #Predicate { $0.id == chartId }
+                )
+            )) ?? []
+            return charts.first?.name ?? "Chart"
+        }()
+
+        let attributes = TimerModulesActivityAttributes(
+            chartName: chartName,
+            timerNotation: timer.notation.isEmpty ? "Timer" : timer.notation
+        )
+        let startedAt = timer.runningSince ?? Date()
+        let endsAt = startedAt.addingTimeInterval(timer.durationSeconds)
+        let initialState = TimerModulesActivityAttributes.ContentState(
+            startDate: startedAt,
+            endDate: endsAt,
+            isPaused: false,
+            isComplete: false
+        )
+
+        do {
+            let activity = try Activity<TimerModulesActivityAttributes>.request(
+                attributes: attributes,
+                content: .init(state: initialState, staleDate: endsAt.addingTimeInterval(60)),
+                pushType: nil
+            )
+            activitiesByTimerId[timer.id] = activity
+        } catch {
+            // Silent on activity request failure — most common cause
+            // is the user has Live Activities disabled in Settings, or
+            // the system is at the activity limit. No log spam.
+        }
+        #endif
+    }
+
+    static func completeLiveActivity(for timer: TimerModuleData) {
+        #if os(iOS) || os(visionOS)
+        guard #available(iOS 16.2, *) else { return }
+        guard let activity = activitiesByTimerId.removeValue(forKey: timer.id) else { return }
+        let now = Date()
+        let finalState = TimerModulesActivityAttributes.ContentState(
+            startDate: activity.content.state.startDate,
+            endDate: now,
+            isPaused: false,
+            isComplete: true
+        )
+        Task {
+            // Keep the "DONE" state visible briefly before dismissing
+            // so the user sees the completion (4 seconds is the system
+            // recommendation for terminal Live Activity states).
+            await activity.update(
+                ActivityContent(state: finalState, staleDate: now.addingTimeInterval(4))
+            )
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            await activity.end(
+                ActivityContent(state: finalState, staleDate: nil),
+                dismissalPolicy: .immediate
+            )
+        }
+        #endif
     }
 }
