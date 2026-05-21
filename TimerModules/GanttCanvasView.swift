@@ -48,17 +48,13 @@ struct GanttCanvasView: View {
     /// chooses "Edit note…" from its long-press / right-click menu.
     @State private var noteEditorTarget: NoteEditorTarget? = nil
 
-    /// Persistent zoom scale that survives between pinch gestures
-    /// (Michael 2026-05-20 — pinch zoom). `gestureZoom` is the
-    /// live multiplier during an active pinch; on gesture end the
-    /// product gets folded into baseZoom and gestureZoom resets.
-    @State private var baseZoom: CGFloat = 1.0
-    @State private var gestureZoom: CGFloat = 1.0
-
-    /// Hard clamp on pinch zoom: 0.5x to 4x.
-    private var combinedZoom: CGFloat {
-        min(max(baseZoom * gestureZoom, 0.5), 4.0)
-    }
+    // Pinch zoom is handled by `ZoomableCanvas` (UIScrollView /
+    // NSScrollView wrapper). The earlier SwiftUI .scaleEffect +
+    // MagnifyGesture attempt couldn't reconcile zoom with content
+    // bounds — pan stopped reaching the corners of zoomed content
+    // (Michael 2026-05-20: "the scrolll bars were zooming in and
+    // zooming out and not scrolling"). The native scroll views
+    // handle both gestures correctly.
 
     /// Identifiable wrapper around an open note-editor session so a
     /// single `.sheet(item:)` modifier on the canvas can present the
@@ -145,28 +141,27 @@ struct GanttCanvasView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView([.vertical, .horizontal]) {
-                VStack(alignment: .leading, spacing: 14) {
-                    if bricksByRow.isEmpty {
-                        emptyCanvasHint
-                            .dropDestination(for: BrickType.self) { items, _ in
-                                handleDrop(items, targetRow: 0, targetColumn: 0)
-                            } isTargeted: { targeted in
-                                dropTargetedNewRow = targeted
-                            }
-                    } else {
-                        ForEach(bricksByRow, id: \.row) { row in
-                            rowContainer(rowIndex: row.row, bricks: row.bricks)
-                                .id(row.row)  // ScrollViewReader anchor
+        ZoomableCanvas {
+            VStack(alignment: .leading, spacing: 14) {
+                if bricksByRow.isEmpty {
+                    emptyCanvasHint
+                        .dropDestination(for: BrickType.self) { items, _ in
+                            handleDrop(items, targetRow: 0, targetColumn: 0)
+                        } isTargeted: { targeted in
+                            dropTargetedNewRow = targeted
                         }
+                } else {
+                    ForEach(bricksByRow, id: \.row) { row in
+                        rowContainer(rowIndex: row.row, bricks: row.bricks)
                     }
-
-                    addNewRowDropZone
                 }
-                .padding(20)
+
+                addNewRowDropZone
             }
-            .coordinateSpace(name: "ganttCanvas")
+            .padding(20)
+            // Traces and × delete handles live INSIDE the zoomable
+            // hosted view so they pan and zoom together with the
+            // cards they reference.
             .overlay(alignment: .topLeading) {
                 traceEdgeOverlay
                     .allowsHitTesting(false)
@@ -174,45 +169,25 @@ struct GanttCanvasView: View {
             .overlay(alignment: .topLeading) {
                 traceDeleteHandles
             }
-            .onPreferenceChange(BrickFramePreferenceKey.self) { newValue in
-                brickFrames = newValue
-            }
-            .background(canvasBackground)
-            // Auto-scroll to the active row when the program runs
-            // through its row-barrier sequence (Michael 2026-05-19,
-            // iPhone testing — "the drop area is so big and
-            // scrollable but the iphone screen is realitively too
-            // small").
-            .onChange(of: activeRunningRow) { _, newRow in
-                if let newRow = newRow {
-                    withAnimation(.easeInOut(duration: 0.35)) {
-                        proxy.scrollTo(newRow, anchor: .center)
-                    }
-                }
-            }
-            .sheet(item: $noteEditorTarget) { target in
-                NoteEditorSheet(
-                    title: target.title,
-                    initialNote: target.initialNote,
-                    onSave: target.onSave
-                )
-            }
-            // Pinch-to-zoom (Michael 2026-05-20). Anchored at the
-            // center; user can pan around afterward with the
-            // existing ScrollView drag. `simultaneousGesture` so
-            // the pinch and ScrollView's pan can both recognize.
-            .scaleEffect(combinedZoom, anchor: .center)
-            .simultaneousGesture(
-                MagnifyGesture()
-                    .onChanged { value in
-                        gestureZoom = value.magnification
-                    }
-                    .onEnded { _ in
-                        baseZoom = combinedZoom
-                        gestureZoom = 1.0
-                    }
+        }
+        .coordinateSpace(name: "ganttCanvas")
+        .onPreferenceChange(BrickFramePreferenceKey.self) { newValue in
+            brickFrames = newValue
+        }
+        .background(canvasBackground)
+        .sheet(item: $noteEditorTarget) { target in
+            NoteEditorSheet(
+                title: target.title,
+                initialNote: target.initialNote,
+                onSave: target.onSave
             )
         }
+        // NOTE: the auto-scroll-to-active-row feature that used
+        // `ScrollViewReader.scrollTo` is removed in this revision
+        // because `ZoomableCanvas` wraps a native UI/NSScrollView,
+        // not a SwiftUI ScrollView. Follow-up: expose a
+        // `scrollTo(rowId:)` programmatic API on ZoomableCanvas so
+        // this can be re-enabled. (Michael 2026-05-20.)
     }
 
     /// The lowest-numbered row that currently has a running timer.
