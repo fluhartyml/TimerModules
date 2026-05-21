@@ -29,6 +29,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     case glyphLCD // 2026-05-21 — 1×4 vertical runtime output (Part II §19). 4 input ports, each with a glyph; LED light-bulb model (one lit at a time).
     case digitalClock  // 2026-05-21 — 2×1 horizontal passive readout (Part II §12). Current system time HH:MM. No trace I/O in v1.0.
     case calendarDate  // 2026-05-21 — 2×1 horizontal passive readout (Part II §12.10). Current system date. No trace I/O in v1.0.
+    case battery       // 2026-05-21 — 1×1 passive readout (Part II §12.11). Battery % on iOS/iPad. Mac variant: shakedown.
 
     // Logic-gate connectors
     case andGate
@@ -92,7 +93,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
 
     var family: Family {
         switch self {
-        case .timerModule, .start, .delay, .textLCD, .glyphLCD, .digitalClock, .calendarDate:
+        case .timerModule, .start, .delay, .textLCD, .glyphLCD, .digitalClock, .calendarDate, .battery:
             return .functional
         case .andGate, .orGate, .notGate, .norGate, .nandGate, .xorGate, .xnorGate:
             return .logicGate
@@ -126,6 +127,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         case .glyphLCD:     return "Glyph LCD"
         case .digitalClock: return "Clock"
         case .calendarDate: return "Date"
+        case .battery:      return "Battery"
         case .andGate:      return "AND"
         case .orGate:       return "OR"
         case .notGate:      return "NOT"
@@ -165,6 +167,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         case .glyphLCD:     return "square.grid.4x3.fill"
         case .digitalClock: return "clock"
         case .calendarDate: return "calendar"
+        case .battery:      return "battery.50"
         case .andGate, .orGate, .notGate, .norGate,
              .nandGate, .xorGate, .xnorGate:
             return nil  // uses textGlyph
@@ -208,7 +211,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     /// nine supplemental types.
     var isWiredUp: Bool {
         switch self {
-        case .timerModule, .start, .delay, .textLCD, .glyphLCD, .digitalClock, .calendarDate,
+        case .timerModule, .start, .delay, .textLCD, .glyphLCD, .digitalClock, .calendarDate, .battery,
              .andGate, .orGate, .notGate, .norGate,
              .nandGate, .xorGate, .xnorGate,
              .trace,

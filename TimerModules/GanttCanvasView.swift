@@ -44,6 +44,7 @@ struct GanttCanvasView: View {
     @Query private var glyphLCDs:     [GlyphLCDBrickData]
     @Query private var digitalClocks: [DigitalClockBrickData]
     @Query private var calendarDates: [CalendarDateBrickData]
+    @Query private var batteries:     [BatteryBrickData]
 
     @State private var brickFrames: [UUID: CGRect] = [:]
     @State private var dropTargetedRow: Int? = nil
@@ -111,6 +112,7 @@ struct GanttCanvasView: View {
         case glyphLCD(GlyphLCDBrickData)
         case digitalClock(DigitalClockBrickData)
         case calendarDate(CalendarDateBrickData)
+        case battery(BatteryBrickData)
 
         var id: UUID {
             switch self {
@@ -123,6 +125,7 @@ struct GanttCanvasView: View {
             case .glyphLCD(let gl):       return gl.id
             case .digitalClock(let dc):   return dc.id
             case .calendarDate(let cd):   return cd.id
+            case .battery(let b):         return b.id
             }
         }
 
@@ -137,6 +140,7 @@ struct GanttCanvasView: View {
             case .glyphLCD(let gl):       return gl.order
             case .digitalClock(let dc):   return dc.order
             case .calendarDate(let cd):   return cd.order
+            case .battery(let b):         return b.order
             }
         }
 
@@ -151,6 +155,7 @@ struct GanttCanvasView: View {
             case .glyphLCD(let gl):       return gl.column
             case .digitalClock(let dc):   return dc.column
             case .calendarDate(let cd):   return cd.column
+            case .battery(let b):         return b.column
             }
         }
     }
@@ -165,7 +170,8 @@ struct GanttCanvasView: View {
         let glc = glyphLCDs.map     { CanvasBrick.glyphLCD($0) }
         let dc  = digitalClocks.map { CanvasBrick.digitalClock($0) }
         let cd  = calendarDates.map { CanvasBrick.calendarDate($0) }
-        return t + g + s + st + d + lc + glc + dc + cd
+        let bt  = batteries.map     { CanvasBrick.battery($0) }
+        return t + g + s + st + d + lc + glc + dc + cd + bt
     }
 
     /// Bricks grouped by row, with each row's bricks sorted by column.
@@ -442,6 +448,16 @@ struct GanttCanvasView: View {
                 }
                 deleteMenuItem(for: brick)
             }
+        case .battery(let b):
+            BatteryBrickView(
+                data: b,
+                onEditNoteTapped: { openNoteEditorForBattery(b) }
+            )
+            .wiringOverlay(id: b.id, wiring: wiring) { tappedBrick(b.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForBattery(b) }
+                deleteMenuItem(for: brick)
+            }
         }
     }
 
@@ -626,6 +642,18 @@ struct GanttCanvasView: View {
         )
     }
 
+    private func openNoteEditorForBattery(_ b: BatteryBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: b.id,
+            title: b.notation.isEmpty ? "Battery" : b.notation,
+            initialNote: b.note,
+            onSave: { newNote in
+                b.note = newNote
+                b.updatedDate = Date()
+            }
+        )
+    }
+
     /// Right-click / long-press context menu items for a card.
     /// Includes Move Up/Down/Left/Right + Delete (Michael caught
     /// both the missing delete and missing move 2026-05-19).
@@ -700,6 +728,10 @@ struct GanttCanvasView: View {
             cd.order = max(0, cd.order + delta.row)
             cd.column = max(0, cd.column + delta.column)
             cd.updatedDate = Date()
+        case .battery(let b):
+            b.order = max(0, b.order + delta.row)
+            b.column = max(0, b.column + delta.column)
+            b.updatedDate = Date()
         }
     }
 
@@ -715,6 +747,7 @@ struct GanttCanvasView: View {
         case .glyphLCD(let gl):      modelContext.delete(gl)
         case .digitalClock(let dc):  modelContext.delete(dc)
         case .calendarDate(let cd):  modelContext.delete(cd)
+        case .battery(let b):        modelContext.delete(b)
         }
     }
 
@@ -1247,6 +1280,18 @@ struct GanttCanvasView: View {
             // "May 21 Thu" format.
             let new = CalendarDateBrickData(
                 notation: "Date",
+                order: row,
+                column: column,
+                ganttChartId: chartId
+            )
+            modelContext.insert(new)
+            return true
+
+        case .battery:
+            // 1×1 passive Battery module (Master Design Spec 12.11).
+            // Battery % on iOS/iPad; "AC" on Mac per the v1.0 shim.
+            let new = BatteryBrickData(
+                notation: "Battery",
                 order: row,
                 column: column,
                 ganttChartId: chartId
