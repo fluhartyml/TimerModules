@@ -159,6 +159,9 @@ struct GanttCanvasView: View {
                 traceEdgeOverlay
                     .allowsHitTesting(false)
             }
+            .overlay(alignment: .topLeading) {
+                traceDeleteHandles
+            }
             .onPreferenceChange(BrickFramePreferenceKey.self) { newValue in
                 brickFrames = newValue
             }
@@ -610,6 +613,63 @@ struct GanttCanvasView: View {
     private static func colorWheelColor(for index: Int) -> Color {
         let hue = (Double(index) * goldenAngleHueStep).truncatingRemainder(dividingBy: 1.0)
         return Color(hue: hue, saturation: 0.85, brightness: 0.95)
+    }
+
+    /// Tappable × button positioned at each wired trace's lane
+    /// midpoint so the user can delete an unwanted trace. Sits in a
+    /// separate hit-testing overlay because the Canvas { } that
+    /// renders the trace path has hit testing disabled.
+    /// (Michael 2026-05-20: "i cant select a trace to delete it.")
+    @ViewBuilder
+    private var traceDeleteHandles: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(traces.filter { $0.isWired }) { trace in
+                if let pos = traceMidpoint(trace) {
+                    Button {
+                        deleteTrace(trace)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .red)
+                            .background(
+                                Circle()
+                                    .fill(.black.opacity(0.4))
+                                    .frame(width: 22, height: 22)
+                            )
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Delete this trace")
+                    .position(x: pos.x, y: pos.y)
+                }
+            }
+        }
+        .allowsHitTesting(true)
+    }
+
+    /// Lane-midpoint position for a trace's delete handle. Returns
+    /// nil if the trace's source/destination frames haven't been
+    /// measured yet (transient first-render state).
+    private func traceMidpoint(_ trace: TraceData) -> CGPoint? {
+        guard let srcId = trace.sourceBrickId,
+              let srcFrame = brickFrames[srcId],
+              let destId = trace.destinationBrickIds.first,
+              let destFrame = brickFrames[destId] else { return nil }
+        let srcPoint = anchorPoint(of: srcFrame, side: trace.sourceAnchor)
+        let destPoint = anchorPoint(of: destFrame, side: trace.destinationAnchor)
+        let laneGap: CGFloat = 18
+        let lane = max(srcFrame.maxY, destFrame.maxY) + laneGap
+        return CGPoint(
+            x: (srcPoint.x + destPoint.x) / 2,
+            y: lane
+        )
+    }
+
+    private func deleteTrace(_ trace: TraceData) {
+        modelContext.delete(trace)
+        try? modelContext.save()
     }
 
     private func anchorPoint(of frame: CGRect, side: TraceAnchor) -> CGPoint {
