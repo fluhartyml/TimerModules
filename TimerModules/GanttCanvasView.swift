@@ -169,10 +169,17 @@ struct GanttCanvasView: View {
             .overlay(alignment: .topLeading) {
                 traceDeleteHandles
             }
-        }
-        .coordinateSpace(name: "ganttCanvas")
-        .onPreferenceChange(BrickFramePreferenceKey.self) { newValue in
-            brickFrames = newValue
+            // The coordinate space and preference listener MUST sit
+            // inside the ZoomableCanvas closure — SwiftUI preferences
+            // don't propagate across a UIHostingController boundary,
+            // so a listener outside the wrapper never receives the
+            // brick frames and the trace overlay would draw using
+            // stale data (Michael 2026-05-20: "the traces get loose
+            // and arnt attached to their modules during pinch zoom").
+            .coordinateSpace(name: "ganttCanvas")
+            .onPreferenceChange(BrickFramePreferenceKey.self) { newValue in
+                brickFrames = newValue
+            }
         }
         .background(canvasBackground)
         .sheet(item: $noteEditorTarget) { target in
