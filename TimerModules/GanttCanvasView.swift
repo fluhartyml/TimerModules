@@ -42,6 +42,7 @@ struct GanttCanvasView: View {
     @Query private var delays:        [DelayBrickData]
     @Query private var textLCDs:      [TextLCDBrickData]
     @Query private var glyphLCDs:     [GlyphLCDBrickData]
+    @Query private var digitalClocks: [DigitalClockBrickData]
 
     @State private var brickFrames: [UUID: CGRect] = [:]
     @State private var dropTargetedRow: Int? = nil
@@ -107,40 +108,44 @@ struct GanttCanvasView: View {
         case delay(DelayBrickData)
         case textLCD(TextLCDBrickData)
         case glyphLCD(GlyphLCDBrickData)
+        case digitalClock(DigitalClockBrickData)
 
         var id: UUID {
             switch self {
-            case .timer(let t):        return t.id
-            case .gate(let g):         return g.id
-            case .supplemental(let s): return s.id
-            case .start(let st):       return st.id
-            case .delay(let d):        return d.id
-            case .textLCD(let l):      return l.id
-            case .glyphLCD(let gl):    return gl.id
+            case .timer(let t):           return t.id
+            case .gate(let g):            return g.id
+            case .supplemental(let s):    return s.id
+            case .start(let st):          return st.id
+            case .delay(let d):           return d.id
+            case .textLCD(let l):         return l.id
+            case .glyphLCD(let gl):       return gl.id
+            case .digitalClock(let dc):   return dc.id
             }
         }
 
         var row: Int {
             switch self {
-            case .timer(let t):        return t.order
-            case .gate(let g):         return g.order
-            case .supplemental(let s): return s.order
-            case .start(let st):       return st.order
-            case .delay(let d):        return d.order
-            case .textLCD(let l):      return l.order
-            case .glyphLCD(let gl):    return gl.order
+            case .timer(let t):           return t.order
+            case .gate(let g):            return g.order
+            case .supplemental(let s):    return s.order
+            case .start(let st):          return st.order
+            case .delay(let d):           return d.order
+            case .textLCD(let l):         return l.order
+            case .glyphLCD(let gl):       return gl.order
+            case .digitalClock(let dc):   return dc.order
             }
         }
 
         var column: Int {
             switch self {
-            case .timer(let t):        return t.column
-            case .gate(let g):         return g.column
-            case .supplemental(let s): return s.column
-            case .start(let st):       return st.column
-            case .delay(let d):        return d.column
-            case .textLCD(let l):      return l.column
-            case .glyphLCD(let gl):    return gl.column
+            case .timer(let t):           return t.column
+            case .gate(let g):            return g.column
+            case .supplemental(let s):    return s.column
+            case .start(let st):          return st.column
+            case .delay(let d):           return d.column
+            case .textLCD(let l):         return l.column
+            case .glyphLCD(let gl):       return gl.column
+            case .digitalClock(let dc):   return dc.column
             }
         }
     }
@@ -153,7 +158,8 @@ struct GanttCanvasView: View {
         let d   = delays.map        { CanvasBrick.delay($0) }
         let lc  = textLCDs.map      { CanvasBrick.textLCD($0) }
         let glc = glyphLCDs.map     { CanvasBrick.glyphLCD($0) }
-        return t + g + s + st + d + lc + glc
+        let dc  = digitalClocks.map { CanvasBrick.digitalClock($0) }
+        return t + g + s + st + d + lc + glc + dc
     }
 
     /// Bricks grouped by row, with each row's bricks sorted by column.
@@ -401,6 +407,20 @@ struct GanttCanvasView: View {
                 }
                 deleteMenuItem(for: brick)
             }
+        case .digitalClock(let dc):
+            DigitalClockBrickView(
+                data: dc,
+                onEditNoteTapped: { openNoteEditorForDigitalClock(dc) }
+            )
+            .wiringOverlay(id: dc.id, wiring: wiring) { tappedBrick(dc.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForDigitalClock(dc) }
+                Button(dc.use24HourFormat ? "Switch to 12-hour" : "Switch to 24-hour") {
+                    dc.use24HourFormat.toggle()
+                    dc.updatedDate = Date()
+                }
+                deleteMenuItem(for: brick)
+            }
         }
     }
 
@@ -561,6 +581,18 @@ struct GanttCanvasView: View {
         )
     }
 
+    private func openNoteEditorForDigitalClock(_ clock: DigitalClockBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: clock.id,
+            title: clock.notation.isEmpty ? "Clock" : clock.notation,
+            initialNote: clock.note,
+            onSave: { newNote in
+                clock.note = newNote
+                clock.updatedDate = Date()
+            }
+        )
+    }
+
     /// Right-click / long-press context menu items for a card.
     /// Includes Move Up/Down/Left/Right + Delete (Michael caught
     /// both the missing delete and missing move 2026-05-19).
@@ -627,19 +659,24 @@ struct GanttCanvasView: View {
             gl.order = max(0, gl.order + delta.row)
             gl.column = max(0, gl.column + delta.column)
             gl.updatedDate = Date()
+        case .digitalClock(let dc):
+            dc.order = max(0, dc.order + delta.row)
+            dc.column = max(0, dc.column + delta.column)
+            dc.updatedDate = Date()
         }
     }
 
     /// Polymorphic delete across all brick families.
     private func deleteCanvasBrick(_ brick: CanvasBrick) {
         switch brick {
-        case .timer(let t):        modelContext.delete(t)
-        case .gate(let g):         modelContext.delete(g)
-        case .supplemental(let s): modelContext.delete(s)
-        case .start(let st):       modelContext.delete(st)
-        case .delay(let d):        modelContext.delete(d)
-        case .textLCD(let l):      modelContext.delete(l)
-        case .glyphLCD(let gl):    modelContext.delete(gl)
+        case .timer(let t):          modelContext.delete(t)
+        case .gate(let g):           modelContext.delete(g)
+        case .supplemental(let s):   modelContext.delete(s)
+        case .start(let st):         modelContext.delete(st)
+        case .delay(let d):          modelContext.delete(d)
+        case .textLCD(let l):        modelContext.delete(l)
+        case .glyphLCD(let gl):      modelContext.delete(gl)
+        case .digitalClock(let dc):  modelContext.delete(dc)
         }
     }
 
@@ -1146,6 +1183,19 @@ struct GanttCanvasView: View {
             // glyphs are common SF Symbols; user edits via "Edit glyphs…".
             let new = GlyphLCDBrickData(
                 notation: "Glyph LCD",
+                order: row,
+                column: column,
+                ganttChartId: chartId
+            )
+            modelContext.insert(new)
+            return true
+
+        case .digitalClock:
+            // 2×1 passive Digital Clock module (Master Design Spec 12).
+            // Shows current system time. Defaults to 12-hour AM/PM
+            // (toggle via long-press / right-click).
+            let new = DigitalClockBrickData(
+                notation: "Clock",
                 order: row,
                 column: column,
                 ganttChartId: chartId
