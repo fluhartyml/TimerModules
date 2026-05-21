@@ -31,6 +31,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     case calendarDate  // 2026-05-21 — 2×1 horizontal passive readout (Part II §12.10). Current system date. No trace I/O in v1.0.
     case battery       // 2026-05-21 — 1×1 passive readout (Part II §12.11). Battery % on iOS/iPad. Mac variant: shakedown.
     case noteModule    // 2026-05-21 — 4×4 quasi-passive canvas annotation (Part II §22.7). Smart Stack of swipable pages; fires output when user reaches last page.
+    case weather       // 2026-05-21 — 2×1 passive readout (Part II §12.12). Icon + temp via WeatherKit. Entitlement risk flagged at 12.13.
 
     // Logic-gate connectors
     case andGate
@@ -94,7 +95,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
 
     var family: Family {
         switch self {
-        case .timerModule, .start, .delay, .textLCD, .glyphLCD, .digitalClock, .calendarDate, .battery, .noteModule:
+        case .timerModule, .start, .delay, .textLCD, .glyphLCD, .digitalClock, .calendarDate, .battery, .noteModule, .weather:
             return .functional
         case .andGate, .orGate, .notGate, .norGate, .nandGate, .xorGate, .xnorGate:
             return .logicGate
@@ -130,6 +131,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         case .calendarDate: return "Date"
         case .battery:      return "Battery"
         case .noteModule:   return "Note"
+        case .weather:      return "Weather"
         case .andGate:      return "AND"
         case .orGate:       return "OR"
         case .notGate:      return "NOT"
@@ -171,6 +173,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
         case .calendarDate: return "calendar"
         case .battery:      return "battery.50"
         case .noteModule:   return "doc.text"
+        case .weather:      return "cloud.sun"
         case .andGate, .orGate, .notGate, .norGate,
              .nandGate, .xorGate, .xnorGate:
             return nil  // uses textGlyph
@@ -214,7 +217,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     /// nine supplemental types.
     var isWiredUp: Bool {
         switch self {
-        case .timerModule, .start, .delay, .textLCD, .glyphLCD, .digitalClock, .calendarDate, .battery, .noteModule,
+        case .timerModule, .start, .delay, .textLCD, .glyphLCD, .digitalClock, .calendarDate, .battery, .noteModule, .weather,
              .andGate, .orGate, .notGate, .norGate,
              .nandGate, .xorGate, .xnorGate,
              .trace,

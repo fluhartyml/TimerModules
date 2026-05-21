@@ -46,6 +46,7 @@ struct GanttCanvasView: View {
     @Query private var calendarDates: [CalendarDateBrickData]
     @Query private var batteries:     [BatteryBrickData]
     @Query private var noteModules:   [NoteModuleBrickData]
+    @Query private var weatherBricks: [WeatherBrickData]
 
     @State private var brickFrames: [UUID: CGRect] = [:]
     @State private var dropTargetedRow: Int? = nil
@@ -115,6 +116,7 @@ struct GanttCanvasView: View {
         case calendarDate(CalendarDateBrickData)
         case battery(BatteryBrickData)
         case noteModule(NoteModuleBrickData)
+        case weather(WeatherBrickData)
 
         var id: UUID {
             switch self {
@@ -129,6 +131,7 @@ struct GanttCanvasView: View {
             case .calendarDate(let cd):   return cd.id
             case .battery(let b):         return b.id
             case .noteModule(let n):      return n.id
+            case .weather(let w):         return w.id
             }
         }
 
@@ -145,6 +148,7 @@ struct GanttCanvasView: View {
             case .calendarDate(let cd):   return cd.order
             case .battery(let b):         return b.order
             case .noteModule(let n):      return n.order
+            case .weather(let w):         return w.order
             }
         }
 
@@ -161,6 +165,7 @@ struct GanttCanvasView: View {
             case .calendarDate(let cd):   return cd.column
             case .battery(let b):         return b.column
             case .noteModule(let n):      return n.column
+            case .weather(let w):         return w.column
             }
         }
     }
@@ -177,7 +182,8 @@ struct GanttCanvasView: View {
         let cd  = calendarDates.map { CanvasBrick.calendarDate($0) }
         let bt  = batteries.map     { CanvasBrick.battery($0) }
         let nm  = noteModules.map   { CanvasBrick.noteModule($0) }
-        return t + g + s + st + d + lc + glc + dc + cd + bt + nm
+        let w   = weatherBricks.map { CanvasBrick.weather($0) }
+        return t + g + s + st + d + lc + glc + dc + cd + bt + nm + w
     }
 
     /// Bricks grouped by row, with each row's bricks sorted by column.
@@ -464,6 +470,20 @@ struct GanttCanvasView: View {
                 editNoteMenuItem { openNoteEditorForBattery(b) }
                 deleteMenuItem(for: brick)
             }
+        case .weather(let w):
+            WeatherBrickView(
+                data: w,
+                onEditNoteTapped: { openNoteEditorForWeather(w) }
+            )
+            .wiringOverlay(id: w.id, wiring: wiring) { tappedBrick(w.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForWeather(w) }
+                Button(w.displayInFahrenheit ? "Switch to Celsius" : "Switch to Fahrenheit") {
+                    w.displayInFahrenheit.toggle()
+                    w.updatedDate = Date()
+                }
+                deleteMenuItem(for: brick)
+            }
         case .noteModule(let n):
             NoteModuleBrickView(
                 data: n,
@@ -707,6 +727,18 @@ struct GanttCanvasView: View {
         )
     }
 
+    private func openNoteEditorForWeather(_ w: WeatherBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: w.id,
+            title: w.notation.isEmpty ? "Weather" : w.notation,
+            initialNote: w.note,
+            onSave: { newNote in
+                w.note = newNote
+                w.updatedDate = Date()
+            }
+        )
+    }
+
     private func openNoteEditorForNoteModule(_ note: NoteModuleBrickData) {
         noteEditorTarget = NoteEditorTarget(
             id: note.id,
@@ -801,6 +833,10 @@ struct GanttCanvasView: View {
             n.order = max(0, n.order + delta.row)
             n.column = max(0, n.column + delta.column)
             n.updatedDate = Date()
+        case .weather(let w):
+            w.order = max(0, w.order + delta.row)
+            w.column = max(0, w.column + delta.column)
+            w.updatedDate = Date()
         }
     }
 
@@ -818,6 +854,7 @@ struct GanttCanvasView: View {
         case .calendarDate(let cd):  modelContext.delete(cd)
         case .battery(let b):        modelContext.delete(b)
         case .noteModule(let n):     modelContext.delete(n)
+        case .weather(let w):        modelContext.delete(w)
         }
     }
 
@@ -1375,6 +1412,19 @@ struct GanttCanvasView: View {
             // user adds more via context menu.
             let new = NoteModuleBrickData(
                 notation: "Note",
+                order: row,
+                column: column,
+                ganttChartId: chartId
+            )
+            modelContext.insert(new)
+            return true
+
+        case .weather:
+            // 2×1 Weather module (Master Design Spec 12.12). Defaults
+            // to Surfside Beach, TX per Michael's bio file; user
+            // edits via context menu (post-shakedown).
+            let new = WeatherBrickData(
+                notation: "Weather",
                 order: row,
                 column: column,
                 ganttChartId: chartId

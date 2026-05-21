@@ -36,6 +36,7 @@ struct TimerModulesApp: App {
             CalendarDateBrickData.self,
             BatteryBrickData.self,
             NoteModuleBrickData.self,
+            WeatherBrickData.self,
             LogEntry.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
