@@ -51,6 +51,13 @@ final class TraceData {
     /// Optional user notation.
     var notation: String
 
+    /// Optional port index on the destination module. Used by
+    /// multi-input modules (Text LCD, Glyph LCD, Status) per
+    /// Master Design Spec 16.1 — port-per-output-state addressing.
+    /// 0-indexed (0 = first port). Default 0; for non-multi-input
+    /// destinations the field is ignored.
+    var destinationPortIndex: Int = 0
+
     /// Bookkeeping.
     var createdDate: Date
     var updatedDate: Date
@@ -65,6 +72,7 @@ final class TraceData {
         column: Int = 0,
         ganttChartId: UUID? = nil,
         notation: String = "",
+        destinationPortIndex: Int = 0,
         createdDate: Date = Date(),
         updatedDate: Date = Date()
     ) {
@@ -77,6 +85,7 @@ final class TraceData {
         self.column = column
         self.ganttChartId = ganttChartId
         self.notation = notation
+        self.destinationPortIndex = destinationPortIndex
         self.createdDate = createdDate
         self.updatedDate = updatedDate
     }

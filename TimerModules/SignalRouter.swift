@@ -354,6 +354,44 @@ enum SignalRouter {
             handleDelaySignal(delay, runId: runId, in: context)
             return
         }
+        if let lcd = fetchOne(TextLCDBrickData.self, id: destId, chartId: chartId, in: context) {
+            handleTextLCDSignal(lcd, via: trace, runId: runId, in: context)
+            return
+        }
+    }
+
+    /// A trace fired into a Text LCD module — update the displayed
+    /// canned message to the trace's destinationPortIndex slot.
+    /// Persistent display per Master Design Spec 19.5: the message
+    /// stays until another port fires.
+    private static func handleTextLCDSignal(
+        _ lcd: TextLCDBrickData,
+        via trace: TraceData,
+        runId: UUID,
+        in context: ModelContext
+    ) {
+        guard let chartId = lcd.ganttChartId else { return }
+
+        // Clamp port index to the locked 0..3 range per 19.3.
+        let port = max(0, min(TextLCDBrickData.portCount - 1, trace.destinationPortIndex))
+        lcd.currentPortIndex = port
+        lcd.updatedDate = Date()
+
+        let displayed = lcd.displayedText
+        log(
+            eventType: "lcdMessageDisplayed",
+            brickId: lcd.id,
+            brickTypeRaw: BrickType.textLCD.rawValue,
+            brickNotation: lcd.notation.isEmpty ? "Text LCD" : lcd.notation,
+            ganttChartId: chartId,
+            payloadJSON: "{\"port\":\(port),\"message\":\"\(escape(displayed))\"}",
+            runId: runId,
+            noteIfAny: lcd.note,
+            in: context
+        )
+
+        // LCDs are runtime-output sinks — no outgoing trace per 19.x.
+        // Cascade ends here for this branch.
     }
 
     /// A trace fired into a Delay module — start its countdown.

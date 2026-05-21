@@ -40,6 +40,7 @@ struct GanttCanvasView: View {
     @Query private var supplementals: [SupplementalBrickData]
     @Query private var starts:        [StartBrickData]
     @Query private var delays:        [DelayBrickData]
+    @Query private var textLCDs:      [TextLCDBrickData]
 
     @State private var brickFrames: [UUID: CGRect] = [:]
     @State private var dropTargetedRow: Int? = nil
@@ -103,6 +104,7 @@ struct GanttCanvasView: View {
         case supplemental(SupplementalBrickData)
         case start(StartBrickData)
         case delay(DelayBrickData)
+        case textLCD(TextLCDBrickData)
 
         var id: UUID {
             switch self {
@@ -111,6 +113,7 @@ struct GanttCanvasView: View {
             case .supplemental(let s): return s.id
             case .start(let st):       return st.id
             case .delay(let d):        return d.id
+            case .textLCD(let l):      return l.id
             }
         }
 
@@ -121,6 +124,7 @@ struct GanttCanvasView: View {
             case .supplemental(let s): return s.order
             case .start(let st):       return st.order
             case .delay(let d):        return d.order
+            case .textLCD(let l):      return l.order
             }
         }
 
@@ -131,6 +135,7 @@ struct GanttCanvasView: View {
             case .supplemental(let s): return s.column
             case .start(let st):       return st.column
             case .delay(let d):        return d.column
+            case .textLCD(let l):      return l.column
             }
         }
     }
@@ -141,7 +146,8 @@ struct GanttCanvasView: View {
         let s  = supplementals.map { CanvasBrick.supplemental($0) }
         let st = starts.map        { CanvasBrick.start($0) }
         let d  = delays.map        { CanvasBrick.delay($0) }
-        return t + g + s + st + d
+        let lc = textLCDs.map      { CanvasBrick.textLCD($0) }
+        return t + g + s + st + d + lc
     }
 
     /// Bricks grouped by row, with each row's bricks sorted by column.
@@ -363,7 +369,54 @@ struct GanttCanvasView: View {
                 }
                 deleteMenuItem(for: brick)
             }
+        case .textLCD(let l):
+            TextLCDBrickView(
+                data: l,
+                onEditNoteTapped: { openNoteEditorForTextLCD(l) }
+            )
+            .wiringOverlay(id: l.id, wiring: wiring) { tappedBrick(l.id) }
+            .contextMenu {
+                editNoteMenuItem { openNoteEditorForTextLCD(l) }
+                Button("Edit canned messages…") {
+                    openCannedMessagesEditor(for: l)
+                }
+                deleteMenuItem(for: brick)
+            }
         }
+    }
+
+    private func openCannedMessagesEditor(for lcd: TextLCDBrickData) {
+        // For v1.0, expose the four canned slots through the same
+        // NoteEditorSheet infrastructure but pre-formatted so each
+        // line is one canned message. The user edits the joined
+        // text; on save we split back into the 4 slots.
+        let joined = lcd.cannedMessages.enumerated().map { idx, msg in
+            "Port \(idx + 1): \(msg)"
+        }.joined(separator: "\n")
+        noteEditorTarget = NoteEditorTarget(
+            id: lcd.id,
+            title: lcd.notation.isEmpty ? "Text LCD" : lcd.notation,
+            initialNote: joined,
+            onSave: { newJoined in
+                // Parse "Port N: text" lines back into the cannedMessages
+                // array. Lines that don't match the format are kept as
+                // best-effort text in their natural index order.
+                let lines = newJoined.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+                var msgs: [String] = Array(repeating: "", count: TextLCDBrickData.portCount)
+                for (i, line) in lines.prefix(TextLCDBrickData.portCount).enumerated() {
+                    // Strip "Port N: " prefix if present.
+                    let trimmed: String
+                    if let colon = line.firstIndex(of: ":") {
+                        trimmed = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+                    } else {
+                        trimmed = line.trimmingCharacters(in: .whitespaces)
+                    }
+                    msgs[i] = String(trimmed.prefix(TextLCDBrickData.charLimit))
+                }
+                lcd.cannedMessages = msgs
+                lcd.updatedDate = Date()
+            }
+        )
     }
 
     // MARK: Note editor wiring (Michael 2026-05-20)
@@ -439,6 +492,18 @@ struct GanttCanvasView: View {
         )
     }
 
+    private func openNoteEditorForTextLCD(_ lcd: TextLCDBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: lcd.id,
+            title: lcd.notation.isEmpty ? "Text LCD" : lcd.notation,
+            initialNote: lcd.note,
+            onSave: { newNote in
+                lcd.note = newNote
+                lcd.updatedDate = Date()
+            }
+        )
+    }
+
     /// Right-click / long-press context menu items for a card.
     /// Includes Move Up/Down/Left/Right + Delete (Michael caught
     /// both the missing delete and missing move 2026-05-19).
@@ -497,6 +562,10 @@ struct GanttCanvasView: View {
             d.order = max(0, d.order + delta.row)
             d.column = max(0, d.column + delta.column)
             d.updatedDate = Date()
+        case .textLCD(let l):
+            l.order = max(0, l.order + delta.row)
+            l.column = max(0, l.column + delta.column)
+            l.updatedDate = Date()
         }
     }
 
@@ -508,6 +577,7 @@ struct GanttCanvasView: View {
         case .supplemental(let s): modelContext.delete(s)
         case .start(let st):       modelContext.delete(st)
         case .delay(let d):        modelContext.delete(d)
+        case .textLCD(let l):      modelContext.delete(l)
         }
     }
 
@@ -989,6 +1059,19 @@ struct GanttCanvasView: View {
             // the long-press / right-click context menu.
             let new = DelayBrickData(
                 notation: "Delay",
+                order: row,
+                column: column,
+                ganttChartId: chartId
+            )
+            modelContext.insert(new)
+            return true
+
+        case .textLCD:
+            // 4×1 Text LCD module (Master Design Spec 19). Ships
+            // with empty canned-message slots; user edits via context
+            // menu's "Edit canned messages…".
+            let new = TextLCDBrickData(
+                notation: "Text LCD",
                 order: row,
                 column: column,
                 ganttChartId: chartId
