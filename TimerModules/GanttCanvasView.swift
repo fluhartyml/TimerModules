@@ -47,6 +47,7 @@ struct GanttCanvasView: View {
     @Query private var batteries:     [BatteryBrickData]
     @Query private var noteModules:   [NoteModuleBrickData]
     @Query private var weatherBricks: [WeatherBrickData]
+    @Query private var cpms:          [CPMBrickData]
 
     @State private var brickFrames: [UUID: CGRect] = [:]
     @State private var dropTargetedRow: Int? = nil
@@ -117,6 +118,7 @@ struct GanttCanvasView: View {
         case battery(BatteryBrickData)
         case noteModule(NoteModuleBrickData)
         case weather(WeatherBrickData)
+        case cpm(CPMBrickData)
 
         var id: UUID {
             switch self {
@@ -132,6 +134,7 @@ struct GanttCanvasView: View {
             case .battery(let b):         return b.id
             case .noteModule(let n):      return n.id
             case .weather(let w):         return w.id
+            case .cpm(let c):             return c.id
             }
         }
 
@@ -149,6 +152,7 @@ struct GanttCanvasView: View {
             case .battery(let b):         return b.order
             case .noteModule(let n):      return n.order
             case .weather(let w):         return w.order
+            case .cpm(let c):             return c.order
             }
         }
 
@@ -166,6 +170,7 @@ struct GanttCanvasView: View {
             case .battery(let b):         return b.column
             case .noteModule(let n):      return n.column
             case .weather(let w):         return w.column
+            case .cpm(let c):             return c.column
             }
         }
     }
@@ -183,7 +188,8 @@ struct GanttCanvasView: View {
         let bt  = batteries.map     { CanvasBrick.battery($0) }
         let nm  = noteModules.map   { CanvasBrick.noteModule($0) }
         let w   = weatherBricks.map { CanvasBrick.weather($0) }
-        return t + g + s + st + d + lc + glc + dc + cd + bt + nm + w
+        let cp  = cpms.map          { CanvasBrick.cpm($0) }
+        return t + g + s + st + d + lc + glc + dc + cd + bt + nm + w + cp
     }
 
     /// Bricks grouped by row, with each row's bricks sorted by column.
@@ -518,6 +524,12 @@ struct GanttCanvasView: View {
                 }
                 deleteMenuItem(for: brick)
             }
+        case .cpm(let c):
+            CPMBrickView(data: c)
+                .wiringOverlay(id: c.id, wiring: wiring) { tappedBrick(c.id) }
+                .contextMenu {
+                    deleteMenuItem(for: brick)
+                }
         }
     }
 
@@ -851,6 +863,10 @@ struct GanttCanvasView: View {
             w.order = max(0, w.order + delta.row)
             w.column = max(0, w.column + delta.column)
             w.updatedDate = Date()
+        case .cpm(let c):
+            c.order = max(0, c.order + delta.row)
+            c.column = max(0, c.column + delta.column)
+            c.updatedDate = Date()
         }
     }
 
@@ -869,6 +885,7 @@ struct GanttCanvasView: View {
         case .battery(let b):        modelContext.delete(b)
         case .noteModule(let n):     modelContext.delete(n)
         case .weather(let w):        modelContext.delete(w)
+        case .cpm(let c):            modelContext.delete(c)
         }
     }
 
