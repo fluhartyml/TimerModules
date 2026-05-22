@@ -257,22 +257,15 @@ struct TimerModuleBrickView: View {
 
     // MARK: Compact status (replaces the HOS dial, Michael 2026-05-20)
     //
-    // A small "status circle" to the LEFT of the time/status text
-    // block. The circle's diameter is matched to the block's measured
-    // height so the two read as visually paired. The text block keeps
-    // its three lines (time, status word, trigger duration) but the
-    // time numerals drop from 44pt to 18pt — the rest of the card no
-    // longer has to defer to a 220pt dial.
+    // Three-line text block: time, status word, trigger duration.
+    // The static status circle was removed 2026-05-22 — per Michael,
+    // "the circle wastes real estate if it doesn't animate." The
+    // running vs idle state is already carried by the time numerals'
+    // color (accent when running, primary when idle) and the status
+    // word ("RUNNING" vs "IDLE").
 
     private var compactStatus: some View {
         HStack(alignment: .center, spacing: 14) {
-            Circle()
-                .stroke(
-                    isRunning ? Color.accentColor : Color.secondary.opacity(0.4),
-                    lineWidth: 3
-                )
-                .frame(width: statusTextHeight, height: statusTextHeight)
-
             VStack(alignment: .leading, spacing: 2) {
                 Text(formattedTime)
                     .font(.system(size: 18, weight: .semibold, design: .monospaced))
