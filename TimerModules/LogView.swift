@@ -1,8 +1,12 @@
 // MARK: - LogView
 //
-// Per-chart execution log sheet. Shows every LogEntry that
-// belongs to the open Gantt chart, newest first. Grouped by
-// run (each Trigger-fired execution shares a runId).
+// Per-chart execution log sheet (iOS) / window (Mac).
+// Shows every LogEntry that belongs to the open Gantt chart,
+// grouped by run (each Trigger / Start press shares a runId).
+//
+// Defaults to showing only the most recent run so iPhone users
+// aren't drowned in historical events (Michael 2026-05-19).
+// A toggle reveals all runs across the chart's history.
 
 import SwiftUI
 import SwiftData
@@ -15,6 +19,9 @@ struct LogView: View {
     @Environment(\.dismissWindow) private var dismissWindow
     @Query private var entries: [LogEntry]
 
+    /// Default to current-run-only; user can flip to see history.
+    @State private var showAllRuns: Bool = false
+
     init(chartId: UUID, chartName: String) {
         self.chartId = chartId
         self.chartName = chartName
@@ -26,48 +33,38 @@ struct LogView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                // Always-visible header with title + explicit Close
-                // button. Belt-and-suspenders with the toolbar Done
-                // — guarantees the user always has a dismiss
-                // affordance regardless of platform (Michael
-                // 2026-05-19 sheet-presentation bug).
-                explicitHeader
+        VStack(spacing: 0) {
+            explicitHeader
 
-                Group {
-                    if entries.isEmpty {
-                        emptyState
-                    } else {
-                        entryList
-                    }
+            Group {
+                if visibleRuns.isEmpty {
+                    emptyState
+                } else {
+                    entryList
                 }
             }
-            .navigationTitle("")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-            #endif
         }
         .frame(minWidth: 480, minHeight: 360)
     }
 
-    /// Header rendered inside the view body — works on iOS sheet
-    /// and Mac window (where toolbar treatment differs / hides).
+    // MARK: Header (always visible, works on both presentations)
+
     private var explicitHeader: some View {
-        HStack {
+        HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(chartName)
                     .font(.headline)
-                Text("Execution log")
+                    .lineLimit(1)
+                Text(showAllRuns ? "All runs" : "Most recent run")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Toggle("All", isOn: $showAllRuns)
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .controlSize(.mini)
+                .help(showAllRuns ? "Showing all runs — toggle off for current only" : "Showing current run only — toggle on for full history")
             Button {
                 closeView()
             } label: {
@@ -80,20 +77,12 @@ struct LogView: View {
             .help("Close the log")
             .keyboardShortcut(.cancelAction)
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 14)
-        .padding(.bottom, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .background(.bar)
     }
 
-    /// Close handler — works for both presentation paths.
-    /// .dismiss handles the sheet case (iOS); dismissWindow
-    /// handles the WindowGroup case (Mac). Calling both is safe;
-    /// each only acts in its applicable presentation context.
-    private func closeView() {
-        dismiss()
-        dismissWindow(id: "logWindow")
-    }
+    // MARK: Empty state
 
     private var emptyState: some View {
         VStack(spacing: 14) {
@@ -102,7 +91,7 @@ struct LogView: View {
                 .foregroundStyle(.tertiary)
             Text("Log is empty")
                 .font(.title3)
-            Text("Run the program (press a Trigger's Start button) to see events recorded here.")
+            Text("Press Start to run the program; events from each run land here.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -111,9 +100,11 @@ struct LogView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: Entry list
+
     private var entryList: some View {
         List {
-            ForEach(groupedByRun, id: \.0) { run in
+            ForEach(visibleRuns, id: \.0) { run in
                 Section {
                     ForEach(run.1) { entry in
                         entryRow(entry)
@@ -129,7 +120,8 @@ struct LogView: View {
     }
 
     /// Groups entries by runId, returning (runId, [entries]) tuples
-    /// sorted with the most recent run first.
+    /// sorted with the most recent run first. Filtered by
+    /// showAllRuns toggle.
     private var groupedByRun: [(UUID, [LogEntry])] {
         let grouped = Dictionary(grouping: entries, by: \.runId)
         return grouped
@@ -137,54 +129,63 @@ struct LogView: View {
             .sorted { ($0.1.first?.timestamp ?? Date.distantPast) > ($1.1.first?.timestamp ?? Date.distantPast) }
     }
 
+    private var visibleRuns: [(UUID, [LogEntry])] {
+        if showAllRuns {
+            return groupedByRun
+        }
+        return Array(groupedByRun.prefix(1))
+    }
+
     private func runHeader(_ runId: UUID, entries: [LogEntry]) -> some View {
         let start = entries.first?.timestamp ?? Date()
         let count = entries.count
         return HStack {
             Text("Run · \(start, format: .dateTime.month().day().hour().minute().second())")
+                .font(.caption)
             Spacer()
             Text("\(count) event\(count == 1 ? "" : "s")")
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
 
     private func entryRow(_ entry: LogEntry) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
                 Text(prettyEventType(entry.eventType))
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
+                    .font(.body.weight(.semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
                 Text(entry.timestamp, format: .dateTime.hour().minute().second())
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.tertiary)
             }
             if !entry.brickNotation.isEmpty {
                 Text(entry.brickNotation)
-                    .font(.system(size: 13))
+                    .font(.callout)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
             if let elapsed = entry.elapsedSeconds {
                 Text("Elapsed: \(formatElapsed(elapsed))")
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.tertiary)
             }
             if !entry.payloadJSON.isEmpty {
                 Text(entry.payloadJSON)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.caption2.monospaced())
                     .foregroundStyle(.tertiary)
                     .lineLimit(2)
+                    .truncationMode(.tail)
             }
         }
         .padding(.vertical, 2)
     }
 
     private func prettyEventType(_ raw: String) -> String {
-        // camelCase → Title Case With Spaces
         var result = ""
         for ch in raw {
-            if ch.isUppercase, !result.isEmpty {
-                result.append(" ")
-            }
+            if ch.isUppercase, !result.isEmpty { result.append(" ") }
             result.append(ch)
         }
         return result.capitalized
@@ -197,5 +198,10 @@ struct LogView: View {
         let s = total % 60
         if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
         return String(format: "%d:%02d", m, s)
+    }
+
+    private func closeView() {
+        dismiss()
+        dismissWindow(id: "logWindow")
     }
 }

@@ -36,7 +36,11 @@ struct ZoomableCanvas<Content: View>: UIViewRepresentable {
         scrollView.showsHorizontalScrollIndicator = true
         scrollView.showsVerticalScrollIndicator = true
         scrollView.backgroundColor = .clear
-        scrollView.contentInsetAdjustmentBehavior = .never
+        // Honor the safe area so row 0 doesn't get clamped under the
+        // app's top toolbar. With `.never` the scroll view's natural
+        // rest position lets content sit under the chrome and the
+        // bounce-back snaps it right back when the user pulls down.
+        scrollView.contentInsetAdjustmentBehavior = .always
 
         let hosting = UIHostingController(rootView: content())
         hosting.view.backgroundColor = .clear

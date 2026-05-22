@@ -37,7 +37,7 @@ final class DelayBrickData {
     /// Configured DISPLAY value (0-9 per Master Design Spec 18.4).
     /// Held seconds = displayValue + 1 per the computer-counting-from-0
     /// convention. Display 0 = 1 second; display 9 = 10 seconds.
-    var displayValue: Int = 5
+    var displayValue: Int = 0
 
     /// Runtime state: the current displayed digit while counting
     /// down. Nil when idle (no signal in flight); when a signal
@@ -67,7 +67,7 @@ final class DelayBrickData {
         id: UUID = UUID(),
         notation: String = "Delay",
         note: String = "",
-        displayValue: Int = 5,
+        displayValue: Int = 0,
         currentCountdown: Int? = nil,
         countdownStartedAt: Date? = nil,
         order: Int = 0,

@@ -394,15 +394,17 @@ struct GanttCanvasView: View {
             )
             .wiringOverlay(id: d.id, wiring: wiring) { tappedBrick(d.id) }
             .contextMenu {
-                editNoteMenuItem { openNoteEditorForDelay(d) }
-                Menu("Delay seconds") {
-                    ForEach(0...9, id: \.self) { v in
-                        Button("\(v + 1)s (display \(v))") {
-                            d.displayValue = v
-                            d.updatedDate = Date()
-                        }
+                Text("Delay: \(d.heldSeconds) sec (display \(d.displayValue))")
+                Divider()
+                ForEach(0...9, id: \.self) { v in
+                    Button("Set to \(v + 1) sec") {
+                        d.displayValue = v
+                        d.updatedDate = Date()
                     }
                 }
+                Divider()
+                Button("Rename…") { openRenameEditorForDelay(d) }
+                editNoteMenuItem { openNoteEditorForDelay(d) }
                 deleteMenuItem(for: brick)
             }
         case .textLCD(let l):
@@ -667,6 +669,18 @@ struct GanttCanvasView: View {
         )
     }
 
+    private func openRenameEditorForDelay(_ delay: DelayBrickData) {
+        noteEditorTarget = NoteEditorTarget(
+            id: delay.id,
+            title: "Rename Delay",
+            initialNote: delay.notation,
+            onSave: { newName in
+                delay.notation = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+                delay.updatedDate = Date()
+            }
+        )
+    }
+
     private func openNoteEditorForTextLCD(_ lcd: TextLCDBrickData) {
         noteEditorTarget = NoteEditorTarget(
             id: lcd.id,
@@ -909,7 +923,7 @@ struct GanttCanvasView: View {
                 VStack(spacing: 4) {
                     Image(systemName: "plus")
                         .font(.system(size: 22, weight: .semibold))
-                    Text(isTargeted ? "Add to row" : "Add card")
+                    Text(isTargeted ? "Add to row" : "Add module")
                         .font(.caption2)
                 }
                 .foregroundStyle(isTargeted ? Color.accentColor : .secondary)
