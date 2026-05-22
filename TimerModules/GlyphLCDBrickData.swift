@@ -16,24 +16,24 @@ import SwiftData
 
 @Model
 final class GlyphLCDBrickData {
-    var id: UUID
-    var notation: String
+    var id: UUID = UUID()
+    var notation: String = "Glyph LCD"
     var note: String = ""
 
     /// The 4 configured glyph identifiers (SF Symbol names like
     /// "sun.max.fill" or emoji like "☀️"). Index = port = cell row.
-    var glyphs: [String]
+    var glyphs: [String] = ["sun.max", "moon", "checkmark", "exclamationmark.triangle"]
 
     /// Runtime state: index of the most-recently-fired port (0-3),
     /// or nil if no port has fired yet. The view lights up that
     /// cell's glyph and dims the others (LED light-bulb model 19.7).
     var currentPortIndex: Int?
 
-    var order: Int
-    var column: Int
+    var order: Int = 0
+    var column: Int = 0
     var ganttChartId: UUID?
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     static let portCount: Int = 4
     static let charLimit: Int = 22

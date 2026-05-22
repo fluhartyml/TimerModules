@@ -26,13 +26,13 @@ import SwiftData
 @Model
 final class StartBrickData {
     /// Stable identifier for cross-reference between bricks on the canvas.
-    var id: UUID
+    var id: UUID = UUID()
 
     /// Internal notation — kept for log entries and cross-references.
     /// The Trigger module renders bare (no on-module label) per the
     /// 2026-05-21 R&D session — human-readable labels live in adjacent
     /// TextLCD modules. Defaults to "Trigger".
-    var notation: String
+    var notation: String = "Trigger"
 
     /// User's free-form note about this module.
     /// Edited via the note.text glyph button in the card's top-right
@@ -47,17 +47,17 @@ final class StartBrickData {
     var hasFired: Bool = false
 
     /// Row on the Gantt canvas (vertical position; lower = higher up).
-    var order: Int
+    var order: Int = 0
 
     /// Column on the Gantt canvas (horizontal position within the row).
-    var column: Int
+    var column: Int = 0
 
     /// Which saved Gantt chart this brick belongs to.
     var ganttChartId: UUID?
 
     /// Bookkeeping.
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     init(
         id: UUID = UUID(),

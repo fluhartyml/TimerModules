@@ -12,18 +12,18 @@ import SwiftData
 
 @Model
 final class CalendarDateBrickData {
-    var id: UUID
-    var notation: String
+    var id: UUID = UUID()
+    var notation: String = "Date"
     var note: String = ""
 
     /// Display style: 0 = "May 21 Thu", 1 = "5/21/26", 2 = "Thu May 21"
-    var formatStyleRaw: Int
+    var formatStyleRaw: Int = 0
 
-    var order: Int
-    var column: Int
+    var order: Int = 0
+    var column: Int = 0
     var ganttChartId: UUID?
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     init(
         id: UUID = UUID(),

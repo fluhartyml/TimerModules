@@ -14,76 +14,76 @@ import SwiftData
 
 @Model
 final class SupplementalBrickData {
-    var id: UUID
+    var id: UUID = UUID()
 
     /// Which BrickType this is. Must be one of the nine
     /// supplemental cases.
-    var brickTypeRaw: String
+    var brickTypeRaw: String = ""
 
     /// Row on the Gantt canvas (vertical position; lower = higher up).
-    var order: Int
+    var order: Int = 0
 
     /// Column on the Gantt canvas (horizontal position within the row).
-    var column: Int
+    var column: Int = 0
 
     /// Which saved Gantt chart this brick belongs to.
     var ganttChartId: UUID?
 
     /// User-editable label across all supplemental types.
-    var notation: String
+    var notation: String = ""
 
     /// User's free-form note about this module (Michael 2026-05-20).
     /// Edited via the note.text glyph button in the card's top-right
     /// corner or the long-press / right-click context menu.
     var note: String = ""
 
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     // MARK: Type-specific fields (most are nil/empty per type)
 
     /// Note: the body text.
     /// Trigger: the label shown on the Start button.
     /// Conditional: the condition expression.
-    var textContent: String
+    var textContent: String = ""
 
     /// Action: action kind raw — "sound" / "notification" / "log" / "link".
     /// Trigger: trigger kind raw — "manual" / "scheduled" / "external".
     /// Webhook: HTTP method — "GET" / "POST" / "PUT" / "DELETE".
-    var kindRaw: String
+    var kindRaw: String = ""
 
     /// Action / Trigger: per-kind config string (sound name, deep-link URL,
     /// schedule cron, etc.).
     /// Webhook: target URL.
-    var configString: String
+    var configString: String = ""
 
     /// Webhook: optional request body (JSON or form-encoded).
-    var bodyContent: String
+    var bodyContent: String = ""
 
     /// Marker: hex color string for the diamond.
-    var markerColorHex: String
+    var markerColorHex: String = "#FFB000"
 
     /// Variable: current numeric value of the counter.
-    var variableValue: Double
+    var variableValue: Double = 0
 
     /// Variable: initial value to reset to.
-    var variableInitial: Double
+    var variableInitial: Double = 0
 
     /// Loop: total iterations to run (Int).
-    var loopCount: Int
+    var loopCount: Int = 1
 
     /// Loop: current iteration counter at run time.
-    var loopCurrentIteration: Int
+    var loopCurrentIteration: Int = 0
 
     /// Group / Conditional / Loop: ids of bricks contained / branched-into
     /// / iterated over. Conditional uses index 0 for the true branch and
     /// index 1+ for the false branch (separated by a sentinel — see
     /// `conditionalTrueIds` / `conditionalFalseIds` computed properties).
-    var containedBrickIds: [UUID]
+    var containedBrickIds: [UUID] = []
 
     /// Conditional: false-branch brick ids stored separately so the
     /// true/false branches don't tangle.
-    var alternateBrickIds: [UUID]
+    var alternateBrickIds: [UUID] = []
 
     init(
         id: UUID = UUID(),

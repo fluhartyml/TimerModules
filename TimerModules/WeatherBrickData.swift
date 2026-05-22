@@ -18,15 +18,15 @@ import SwiftData
 
 @Model
 final class WeatherBrickData {
-    var id: UUID
-    var notation: String
+    var id: UUID = UUID()
+    var notation: String = "Weather"
     var note: String = ""
 
     /// Location used for the WeatherKit query.
-    var latitude: Double
-    var longitude: Double
+    var latitude: Double = 28.94
+    var longitude: Double = -95.28
     /// Human-readable location label shown in the UI / accessibility.
-    var locationLabel: String
+    var locationLabel: String = "Surfside Beach, TX"
 
     /// Cached most-recent fetch (so the view shows last-known values
     /// even before the next async fetch completes).
@@ -36,13 +36,13 @@ final class WeatherBrickData {
     var cachedLastFetched: Date?
 
     /// Display temp in Fahrenheit (default) vs. Celsius.
-    var displayInFahrenheit: Bool
+    var displayInFahrenheit: Bool = true
 
-    var order: Int
-    var column: Int
+    var order: Int = 0
+    var column: Int = 0
     var ganttChartId: UUID?
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     init(
         id: UUID = UUID(),

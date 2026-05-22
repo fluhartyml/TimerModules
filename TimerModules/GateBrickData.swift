@@ -16,25 +16,25 @@ import SwiftData
 @Model
 final class GateBrickData {
     /// Stable identifier — used by traces (M4) to reference this gate.
-    var id: UUID
+    var id: UUID = UUID()
 
     /// Stores BrickType.rawValue. Constrained to the seven boolean
     /// gate cases (.andGate, .orGate, .notGate, .norGate, .nandGate,
     /// .xorGate, .xnorGate). Stored as String so SwiftData can persist
     /// it without needing a custom transformer.
-    var gateTypeRaw: String
+    var gateTypeRaw: String = ""
 
     /// Row on the Gantt canvas (vertical position; lower = higher up).
-    var order: Int
+    var order: Int = 0
 
     /// Column on the Gantt canvas (horizontal position within the row).
-    var column: Int
+    var column: Int = 0
 
     /// Which saved Gantt chart this brick belongs to.
     var ganttChartId: UUID?
 
     /// Optional user notation — gate brick can be labeled like timers.
-    var notation: String
+    var notation: String = ""
 
     /// User's free-form note about this gate (Michael 2026-05-20).
     /// Edited via the note.text glyph button in the card's top-right
@@ -42,8 +42,8 @@ final class GateBrickData {
     var note: String = ""
 
     /// Bookkeeping.
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     init(
         id: UUID = UUID(),

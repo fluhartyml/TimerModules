@@ -17,12 +17,12 @@ enum TimerMode: String, Codable {
 @Model
 final class TimerModuleData {
     /// Stable identifier for cross-reference between bricks on the canvas.
-    var id: UUID
+    var id: UUID = UUID()
 
     /// User-entered notation — the label that appears prominently on the
     /// brick face so the Gantt is self-explanatory at a glance.
     /// Required UX element per roadmap Section 1.5.1.
-    var notation: String
+    var notation: String = "Timer"
 
     /// User's free-form note about this module (Michael 2026-05-20).
     /// Edited via the note.text glyph button in the card's top-right
@@ -32,29 +32,29 @@ final class TimerModuleData {
 
     /// Countdown vs. count-up. Both modes ship in v1.0
     /// (roadmap Section 3.2).
-    var mode: TimerMode
+    var mode: TimerMode = TimerMode.countUp
 
     /// For countdown mode: the total duration in seconds when the timer
     /// is reset. For count-up mode: ignored (the brick just accumulates).
-    var durationSeconds: TimeInterval
+    var durationSeconds: TimeInterval = 25 * 60
 
     /// Accumulated elapsed seconds at the last stop. Combined with
     /// runningSince to compute current elapsed time. The HOS pattern
     /// (accumulatedSeconds + (now − runningSince)) survives stop/start
     /// cleanly and is lifted verbatim per roadmap Section 2.
-    var accumulatedSeconds: TimeInterval
+    var accumulatedSeconds: TimeInterval = 0
 
     /// Non-nil while the timer is running; nil when idle/paused/done.
     /// Used together with accumulatedSeconds for elapsed-time math.
     var runningSince: Date?
 
     /// Row on the Gantt canvas (vertical position; lower = higher up).
-    var order: Int
+    var order: Int = 0
 
     /// Column on the Gantt canvas (horizontal position within the row;
     /// 0 = leftmost). Same-row + different-column = sequential bricks.
     /// Different-row + same-column = parallel/simultaneous bricks.
-    var column: Int
+    var column: Int = 0
 
     /// Which saved Gantt chart this brick belongs to. Nil for legacy
     /// rows from before M5.5; auto-assigned to the active chart at
@@ -62,8 +62,8 @@ final class TimerModuleData {
     var ganttChartId: UUID?
 
     /// Bookkeeping.
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     init(
         id: UUID = UUID(),

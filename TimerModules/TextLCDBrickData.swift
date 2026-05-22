@@ -20,18 +20,18 @@ import SwiftData
 @Model
 final class TextLCDBrickData {
     /// Stable identifier.
-    var id: UUID
+    var id: UUID = UUID()
 
     /// User-entered notation — doubles as the "idle state" display
     /// text per Master Design Spec 19.4. Defaults to "Text LCD".
-    var notation: String
+    var notation: String = "Text LCD"
 
     /// User's free-form note.
     var note: String = ""
 
     /// The 4 canned-message slots (22 char max each per 19.3).
     /// Index 0 = port 1, index 1 = port 2, etc.
-    var cannedMessages: [String]
+    var cannedMessages: [String] = ["", "", "", ""]
 
     /// Runtime state: index of the most-recently-fired port (0-3),
     /// or nil if no port has fired this run. When non-nil, the
@@ -40,17 +40,17 @@ final class TextLCDBrickData {
     var currentPortIndex: Int?
 
     /// Row on the Gantt canvas.
-    var order: Int
+    var order: Int = 0
 
     /// Column on the Gantt canvas.
-    var column: Int
+    var column: Int = 0
 
     /// Which saved Gantt chart this brick belongs to.
     var ganttChartId: UUID?
 
     /// Bookkeeping.
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     /// Locked port count for v1.0 per 19.3.
     static let portCount: Int = 4

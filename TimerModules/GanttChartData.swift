@@ -11,29 +11,29 @@ import SwiftData
 @Model
 final class GanttChartData {
     /// Stable identifier — referenced by every brick's ganttChartId.
-    var id: UUID
+    var id: UUID = UUID()
 
     /// User-visible name of the chart (shown in the chart list and
     /// in printable exports). Defaults to "New Gantt" until renamed.
-    var name: String
+    var name: String = "New Gantt"
 
     /// Optional user notation / description.
-    var notation: String
+    var notation: String = ""
 
     /// How many columns wide this chart's grid is (user-defined per
     /// chart, Michael 2026-05-19). Default 1 = single-column (the
     /// pre-M5.5 vertical-stack layout). Increase to lay bricks out
     /// in parallel tracks at the same horizontal position.
-    var columnCount: Int
+    var columnCount: Int = 1
 
     /// Bookkeeping.
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     /// Last time the user opened this chart — used to sort the
     /// chart list (most-recently-used first) and to auto-select
     /// the active chart on app launch.
-    var lastOpenedDate: Date
+    var lastOpenedDate: Date = Date()
 
     init(
         id: UUID = UUID(),

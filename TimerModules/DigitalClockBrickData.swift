@@ -16,18 +16,18 @@ import SwiftData
 
 @Model
 final class DigitalClockBrickData {
-    var id: UUID
-    var notation: String
+    var id: UUID = UUID()
+    var notation: String = "Clock"
     var note: String = ""
 
     /// Whether to render in 24-hour mode (default) vs. 12-hour AM/PM.
-    var use24HourFormat: Bool
+    var use24HourFormat: Bool = false
 
-    var order: Int
-    var column: Int
+    var order: Int = 0
+    var column: Int = 0
     var ganttChartId: UUID?
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     init(
         id: UUID = UUID(),

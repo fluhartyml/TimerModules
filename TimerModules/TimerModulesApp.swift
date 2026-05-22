@@ -39,7 +39,16 @@ struct TimerModulesApp: App {
             WeatherBrickData.self,
             LogEntry.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        // Universal file share — sync the canvas across the user's
+        // signed-in Apple ID via private CloudKit database. Same chart
+        // is editable on Mac, iPhone, iPad. Requires the iCloud
+        // capability + CloudKit service + container in TimerModules.entitlements
+        // (locked 2026-05-21).
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .private("iCloud.com.nightgard.timermodules")
+        )
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])

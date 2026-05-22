@@ -17,12 +17,12 @@ import SwiftData
 
 @Model
 final class NoteModuleBrickData {
-    var id: UUID
-    var notation: String
+    var id: UUID = UUID()
+    var notation: String = "Note"
     var note: String = ""
 
     /// Array of page text contents. Index 0 = first page.
-    var pages: [String]
+    var pages: [String] = [""]
 
     /// Runtime / UI state: which page is currently displayed.
     var currentPageIndex: Int = 0
@@ -33,11 +33,11 @@ final class NoteModuleBrickData {
     /// fire-once semantics.
     var lastPageReachedFiredThisRun: Bool = false
 
-    var order: Int
-    var column: Int
+    var order: Int = 0
+    var column: Int = 0
     var ganttChartId: UUID?
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     static let maxPages: Int = 99
     static let charLimitPerPage: Int = 400

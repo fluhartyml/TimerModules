@@ -21,35 +21,35 @@ import SwiftData
 
 @Model
 final class TraceData {
-    var id: UUID
+    var id: UUID = UUID()
 
     /// Stores BrickType.rawValue. Must be one of the six PM-dependency
     /// cases (.fsEdge, .ssEdge, .ffEdge, .sfEdge, .lagLead, .splitter).
-    var traceTypeRaw: String
+    var traceTypeRaw: String = ""
 
     /// The upstream brick's id. nil until the user picks a source.
     var sourceBrickId: UUID?
 
     /// Downstream brick ids. Length 1 for FS/SS/FF/SF/lagLead, length 1+
     /// for splitter. Empty until the user picks at least one destination.
-    var destinationBrickIds: [UUID]
+    var destinationBrickIds: [UUID] = []
 
     /// Offset in seconds applied to the trace's trigger event. Positive
     /// = downstream event happens N seconds AFTER the trigger (lag).
     /// Negative = downstream event happens N seconds BEFORE (lead).
-    var lagSeconds: TimeInterval
+    var lagSeconds: TimeInterval = 0
 
     /// Row on the Gantt canvas (vertical position; lower = higher up).
-    var order: Int
+    var order: Int = 0
 
     /// Column on the Gantt canvas (horizontal position within the row).
-    var column: Int
+    var column: Int = 0
 
     /// Which saved Gantt chart this trace belongs to.
     var ganttChartId: UUID?
 
     /// Optional user notation.
-    var notation: String
+    var notation: String = ""
 
     /// Optional port index on the destination module. Used by
     /// multi-input modules (Text LCD, Glyph LCD, Status) per
@@ -59,8 +59,8 @@ final class TraceData {
     var destinationPortIndex: Int = 0
 
     /// Bookkeeping.
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     init(
         id: UUID = UUID(),

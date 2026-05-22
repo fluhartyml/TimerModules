@@ -25,10 +25,10 @@ import SwiftData
 @Model
 final class DelayBrickData {
     /// Stable identifier for cross-reference between bricks on the canvas.
-    var id: UUID
+    var id: UUID = UUID()
 
     /// User-entered notation — defaults to "Delay" if blank.
-    var notation: String
+    var notation: String = "Delay"
 
     /// User's free-form note about this module. Logged as a
     /// `moduleNote` LogEntry at fire time.
@@ -51,17 +51,17 @@ final class DelayBrickData {
     var countdownStartedAt: Date?
 
     /// Row on the Gantt canvas (vertical position).
-    var order: Int
+    var order: Int = 0
 
     /// Column on the Gantt canvas (horizontal position within row).
-    var column: Int
+    var column: Int = 0
 
     /// Which saved Gantt chart this brick belongs to.
     var ganttChartId: UUID?
 
     /// Bookkeeping.
-    var createdDate: Date
-    var updatedDate: Date
+    var createdDate: Date = Date()
+    var updatedDate: Date = Date()
 
     init(
         id: UUID = UUID(),
