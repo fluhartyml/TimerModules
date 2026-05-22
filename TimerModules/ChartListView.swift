@@ -91,20 +91,12 @@ struct ChartListView: View {
             Image(systemName: "rectangle.3.group")
                 .font(.system(size: 56))
                 .foregroundStyle(.tertiary)
-            Text("No Timer Modules yet")
+            Text("No module canvases yet")
                 .font(.title2)
-            Text("Create your first Timer Module to start building a program.")
+            Text("Press + to make your first module canvas.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button {
-                createNewChart()
-            } label: {
-                Label("New Timer Module", systemImage: "plus")
-                    .font(.headline)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
