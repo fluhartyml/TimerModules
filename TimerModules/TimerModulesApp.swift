@@ -39,6 +39,7 @@ struct TimerModulesApp: App {
             WeatherBrickData.self,
             CPMBrickData.self,
             CPMEvent.self,
+            CPMUserPreferences.self,
             LogEntry.self,
         ])
         // Universal file share — sync the canvas across the user's
