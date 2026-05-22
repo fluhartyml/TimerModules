@@ -91,7 +91,7 @@ struct ChartListView: View {
             Image(systemName: "rectangle.3.group")
                 .font(.system(size: 56))
                 .foregroundStyle(.tertiary)
-            Text("No module canvases yet")
+            Text("No module canvas yet")
                 .font(.title2)
             Text("Press + to make your first module canvas.")
                 .font(.body)
