@@ -40,12 +40,13 @@ final class CPMBrickData {
     /// note.text glyph button or long-press / right-click context menu.
     var note: String = ""
 
-    /// The events held by this CPM. Each CPMEvent has its own recurrence
-    /// rule and the port number(s) it fires when triggered. Many-to-many
-    /// event-to-port mapping lives on the CPMEvent (multi-valued portNumbers
-    /// array; many events may share a port number).
-    @Relationship(deleteRule: .cascade, inverse: \CPMEvent.ownerCPM)
-    var events: [CPMEvent] = []
+    // NOTE: events are not stored as a Swift-reference relationship on
+    // CPMBrickData. The project pattern (matching how every other module
+    // links to GanttChartData via `ganttChartId: UUID?`) is a foreign-key
+    // UUID stored on the child. Views query CPMEvents filtered by
+    // `ownerCPMId == self.id`. This is the CloudKit-friendly shape —
+    // private CloudKit databases reject Swift-reference @Relationship
+    // declarations in this project's setup.
 
     /// EKCalendar identifier for the CPM's dedicated write-back calendar
     /// in Apple Calendar (the "TimerModulesCPM" calendar). Created on
@@ -77,7 +78,6 @@ final class CPMBrickData {
         id: UUID = UUID(),
         notation: String = "CPM",
         note: String = "",
-        events: [CPMEvent] = [],
         writeCalendarIdentifier: String? = nil,
         order: Int = 0,
         column: Int = 0,
@@ -88,7 +88,6 @@ final class CPMBrickData {
         self.id = id
         self.notation = notation
         self.note = note
-        self.events = events
         self.writeCalendarIdentifier = writeCalendarIdentifier
         self.order = order
         self.column = column

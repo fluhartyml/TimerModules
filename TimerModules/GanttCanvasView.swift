@@ -885,7 +885,17 @@ struct GanttCanvasView: View {
         case .battery(let b):        modelContext.delete(b)
         case .noteModule(let n):     modelContext.delete(n)
         case .weather(let w):        modelContext.delete(w)
-        case .cpm(let c):            modelContext.delete(c)
+        case .cpm(let c):
+            // Cascade-delete owned CPMEvents manually since we use
+            // foreign-key UUIDs (CloudKit-friendly) rather than a
+            // SwiftData @Relationship — see CPMEvent.ownerCPMId.
+            let cpmId = c.id
+            let predicate = #Predicate<CPMEvent> { $0.ownerCPMId == cpmId }
+            let descriptor = FetchDescriptor<CPMEvent>(predicate: predicate)
+            if let owned = try? modelContext.fetch(descriptor) {
+                for event in owned { modelContext.delete(event) }
+            }
+            modelContext.delete(c)
         }
     }
 

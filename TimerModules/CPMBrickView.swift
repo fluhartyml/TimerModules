@@ -20,6 +20,16 @@ import SwiftData
 struct CPMBrickView: View {
     let data: CPMBrickData
 
+    /// CPMEvents owned by this CPM, queried by foreign-key UUID.
+    /// Matches the project's flat-model convention — see CPMEvent.ownerCPMId.
+    @Query private var ownedEvents: [CPMEvent]
+
+    init(data: CPMBrickData) {
+        self.data = data
+        let cpmId = data.id
+        _ownedEvents = Query(filter: #Predicate<CPMEvent> { $0.ownerCPMId == cpmId })
+    }
+
     /// 4×4 canvas footprint, sized to the standard 60pt brick cell.
     /// 4 cells wide × 60pt + 3 inter-cell gaps × 4pt = 252pt.
     /// 4 cells tall × 60pt + 3 inter-cell gaps × 4pt = 252pt.
@@ -74,11 +84,10 @@ struct CPMBrickView: View {
     /// Empty-state summary line. Once Phase 4 adds the event grid this
     /// will be replaced by the Smart Stack face content.
     private var eventCountSummary: String {
-        let count = data.events.count
-        switch count {
+        switch ownedEvents.count {
         case 0:  return "no events yet"
         case 1:  return "1 event"
-        default: return "\(count) events"
+        default: return "\(ownedEvents.count) events"
         }
     }
 }

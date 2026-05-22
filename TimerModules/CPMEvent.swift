@@ -22,9 +22,12 @@ final class CPMEvent {
     /// Stable identifier.
     var id: UUID = UUID()
 
-    /// Owning CPM. Reverse of CPMBrickData.events. Cascade-deleted when
-    /// the parent CPM is removed from the canvas.
-    var ownerCPM: CPMBrickData?
+    /// Owning CPM's id. Foreign-key style (matches project convention
+    /// of `ganttChartId: UUID?` etc.) — CloudKit-friendly. Views query
+    /// CPMEvents by `ownerCPMId == cpm.id` rather than walking a Swift
+    /// reference. CPM deletion must explicitly cascade-delete the
+    /// matching CPMEvents (handled in GanttCanvasView.deleteCanvasBrick).
+    var ownerCPMId: UUID?
 
     /// Col 1: event name (free-form identifier; not user-facing on canvas,
     /// surfaces inside the CPM Smart Stack's event-grid face).
@@ -69,7 +72,7 @@ final class CPMEvent {
 
     init(
         id: UUID = UUID(),
-        ownerCPM: CPMBrickData? = nil,
+        ownerCPMId: UUID? = nil,
         eventName: String = "",
         briefDescription: String = "",
         portNumbers: [Int] = [],
@@ -81,7 +84,7 @@ final class CPMEvent {
         updatedDate: Date = Date()
     ) {
         self.id = id
-        self.ownerCPM = ownerCPM
+        self.ownerCPMId = ownerCPMId
         self.eventName = eventName
         // Hard-cap brief description at 22 chars per the locked event-grid spec.
         self.briefDescription = String(briefDescription.prefix(22))
