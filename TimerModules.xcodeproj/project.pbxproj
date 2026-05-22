@@ -54,6 +54,7 @@
 		C08B51A82FBFCB6C00F7FC36 /* TimerModulesWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TimerModulesWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C08B51AA2FBFCB6C00F7FC36 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		C08B51AC2FBFCB6C00F7FC36 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		C0A369F92FBFF8980034DD70 /* TimerModulesWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TimerModulesWidgetExtension.entitlements; sourceTree = "<group>"; };
 		C0C166002FB8B2E60009DD85 /* TimerModules.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TimerModules.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0C166112FB8B2E80009DD85 /* TimerModulesTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TimerModulesTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0C1661B2FB8B2E80009DD85 /* TimerModulesUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TimerModulesUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -151,6 +152,7 @@
 		C0C165F72FB8B2E60009DD85 = {
 			isa = PBXGroup;
 			children = (
+				C0A369F92FBFF8980034DD70 /* TimerModulesWidgetExtension.entitlements */,
 				C0C166022FB8B2E60009DD85 /* TimerModules */,
 				C0C166142FB8B2E80009DD85 /* TimerModulesTests */,
 				C0C1661E2FB8B2E80009DD85 /* TimerModulesUITests */,
@@ -400,6 +402,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = TimerModulesWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;
@@ -432,6 +435,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = TimerModulesWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;
@@ -465,6 +469,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = TimerModules/TimerModules.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;
@@ -510,6 +515,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = TimerModules/TimerModules.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3X3F6UJ44H;

@@ -1330,6 +1330,21 @@ struct GanttCanvasView: View {
             modelContext.insert(new)
             return true
 
+        case .calendarProcessing:
+            // 4×4 Calendar Processing Module — spec lives in
+            // TimerModules-Brain-Module-Refinement-2026-05-22.html.
+            // Phase 1 scaffold: create the brick with default empty
+            // event list. Smart Stack faces, EventKit hookup, and
+            // dedicated TimerModulesCPM calendar arrive in later phases.
+            let new = CPMBrickData(
+                notation: "CPM",
+                order: row,
+                column: column,
+                ganttChartId: chartId
+            )
+            modelContext.insert(new)
+            return true
+
         case .start:
             // Locked design (Part I § 2): exactly ONE Trigger per chart
             // for v1.0. (May relax for multi-Trigger cascades per the
