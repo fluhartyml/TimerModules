@@ -89,6 +89,12 @@ struct CPMDetailView: View {
                         data.updatedDate = Date()
                     }
                 }
+                // Phase 7: request iOS local-notification permission so
+                // event firings can raise a notification when the app
+                // isn't in foreground. Per-event Silent toggle still
+                // suppresses individual events even when permission is
+                // granted.
+                await CPMNotificationScheduler.requestPermission()
             }
         }
     }
@@ -195,7 +201,12 @@ struct CPMDetailView: View {
 
     private func deleteEvents(at offsets: IndexSet) {
         for index in offsets {
-            modelContext.delete(ownedEvents[index])
+            let event = ownedEvents[index]
+            // Phase 7: cancel any pending iOS notification for this
+            // event before removing the row. No-op if nothing was
+            // scheduled.
+            CPMNotificationScheduler.cancel(event)
+            modelContext.delete(event)
         }
     }
 

@@ -141,6 +141,11 @@ struct CPMEventEditorView: View {
         event.portNumbers = Array(Set(candidates)).sorted()
         // Bookkeeping
         event.updatedDate = Date()
+        // Phase 7: (re)schedule the iOS local notification for this
+        // event. Internally removes any previous pending request for
+        // the same event id before adding the new one. No-op for
+        // recurrence modes that don't yet resolve a firing date.
+        CPMNotificationScheduler.schedule(event)
         dismiss()
     }
 }
