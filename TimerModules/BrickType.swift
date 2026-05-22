@@ -165,7 +165,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     var symbolName: String? {
         switch self {
         case .timerModule:  return "timer"
-        case .start:        return "play.circle.fill"
+        case .start:        return "circle.fill"
         case .delay:        return "hourglass"
         case .textLCD:      return "text.viewfinder"
         case .glyphLCD:     return "square.grid.4x3.fill"

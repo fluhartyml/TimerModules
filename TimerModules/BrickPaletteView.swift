@@ -161,12 +161,21 @@ struct BrickPaletteView: View {
         } else if let symbolName = type.symbolName {
             Image(systemName: symbolName)
                 .font(.system(size: 22))
+                .foregroundStyle(paletteTileTint(for: type))
         } else if let glyph = type.textGlyph {
             Text(glyph)
                 .font(.system(size: 24, weight: .semibold, design: .serif))
         } else {
             Image(systemName: "questionmark.square.dashed")
                 .font(.system(size: 22))
+        }
+    }
+
+    private func paletteTileTint(for type: BrickType) -> Color {
+        switch type {
+        case .start:    return .yellow     // Trigger module — matches canvas PUSH disc
+        case .endBrick: return .red        // End module — matches canvas stop disc
+        default:        return .accentColor
         }
     }
 
