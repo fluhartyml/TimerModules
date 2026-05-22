@@ -151,7 +151,7 @@ enum SignalRouter {
             eventType: "programStarted",
             brickId: start.id,
             brickTypeRaw: BrickType.start.rawValue,
-            brickNotation: start.notation.isEmpty ? "Start" : start.notation,
+            brickNotation: start.notation.isEmpty ? "Trigger" : start.notation,
             ganttChartId: chartId,
             runId: runId,
             noteIfAny: start.note,

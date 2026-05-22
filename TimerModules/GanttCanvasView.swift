@@ -648,7 +648,7 @@ struct GanttCanvasView: View {
     private func openNoteEditorForStart(_ start: StartBrickData) {
         noteEditorTarget = NoteEditorTarget(
             id: start.id,
-            title: start.notation.isEmpty ? "Start" : start.notation,
+            title: start.notation.isEmpty ? "Trigger" : start.notation,
             initialNote: start.note,
             onSave: { newNote in
                 start.note = newNote
@@ -1331,12 +1331,13 @@ struct GanttCanvasView: View {
             return true
 
         case .start:
-            // Locked design (Part I § 2): exactly ONE Start per chart.
-            // Reject the drop if this chart already has one.
+            // Locked design (Part I § 2): exactly ONE Trigger per chart
+            // for v1.0. (May relax for multi-Trigger cascades per the
+            // 2026-05-21 R&D session — deferred to shakedown.)
             let existingStart = starts.first { $0.ganttChartId == chartId }
             guard existingStart == nil else { return false }
             let new = StartBrickData(
-                notation: "Start",
+                notation: "Trigger",
                 order: row,
                 column: column,
                 ganttChartId: chartId

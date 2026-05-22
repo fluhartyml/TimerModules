@@ -28,8 +28,10 @@ final class StartBrickData {
     /// Stable identifier for cross-reference between bricks on the canvas.
     var id: UUID
 
-    /// User-entered notation — the label that appears on the brick face.
-    /// Optional; defaults to "Start" if user leaves it blank.
+    /// Internal notation — kept for log entries and cross-references.
+    /// The Trigger module renders bare (no on-module label) per the
+    /// 2026-05-21 R&D session — human-readable labels live in adjacent
+    /// TextLCD modules. Defaults to "Trigger".
     var notation: String
 
     /// User's free-form note about this module.
@@ -59,7 +61,7 @@ final class StartBrickData {
 
     init(
         id: UUID = UUID(),
-        notation: String = "Start",
+        notation: String = "Trigger",
         note: String = "",
         hasFired: Bool = false,
         order: Int = 0,

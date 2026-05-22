@@ -123,7 +123,7 @@ enum BrickType: String, Codable, CaseIterable, Identifiable, Transferable {
     var displayName: String {
         switch self {
         case .timerModule:  return "Timer"
-        case .start:        return "Start"
+        case .start:        return "Trigger"
         case .delay:        return "Delay"
         case .textLCD:      return "Text LCD"
         case .glyphLCD:     return "Glyph LCD"
