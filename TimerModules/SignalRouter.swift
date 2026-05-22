@@ -249,6 +249,9 @@ enum SignalRouter {
         // begin a new run after stopping (locked design Part I §2.5).
         rearmStartModules(chartId: chartId, in: context)
 
+        // Push idle snapshot to the widget so it reflects the stop.
+        WidgetSnapshotPublisher.publishIdle()
+
         let runningTimers = (try? context.fetch(
             FetchDescriptor<TimerModuleData>(
                 predicate: #Predicate { $0.ganttChartId == chartId && $0.runningSince != nil }
@@ -322,6 +325,7 @@ enum SignalRouter {
         )
 
         completeLiveActivity(for: timer)
+        WidgetSnapshotPublisher.publish(chartId: chartId, in: context)
 
         // If this timer is in a running Loop's body, let the loop
         // tick its pending-set so it can iterate or exit.
@@ -645,6 +649,7 @@ enum SignalRouter {
                 in: context
             )
             startLiveActivity(for: timer, chartId: chartId, in: context)
+            WidgetSnapshotPublisher.publish(chartId: chartId, in: context)
         default:
             break
         }
@@ -674,6 +679,7 @@ enum SignalRouter {
                 in: context
             )
             rearmStartModules(chartId: chartId, in: context)
+            WidgetSnapshotPublisher.publishIdle()
 
         case .action:
             log(

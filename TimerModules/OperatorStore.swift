@@ -29,7 +29,6 @@ final class OperatorStore {
             self.items = []
         }
         deduplicateByID()
-        WidgetSnapshotPublisher.publish(from: self)
     }
 
     /// Removes duplicate records that share the same logical `id`. Duplicates appear
