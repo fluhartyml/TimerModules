@@ -22,6 +22,8 @@ struct CPMDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    @StateObject private var eventKit = CPMEventKitStore.shared
+
     /// CPMEvents owned by this CPM, queried by foreign-key UUID.
     @Query private var ownedEvents: [CPMEvent]
 
@@ -72,6 +74,21 @@ struct CPMDetailView: View {
             .sheet(item: $editingEvent) { event in
                 CPMEventEditorView(event: event)
                     .presentationDetents([.medium, .large])
+            }
+            .task {
+                // Phase 5+6: request EventKit access on first sheet open
+                // and provision the dedicated TimerModulesCPM calendar.
+                // Idempotent — repeated calls are cheap once permission
+                // is granted and the calendar exists.
+                if !eventKit.hasFullAccess {
+                    await eventKit.requestAccess()
+                }
+                if eventKit.hasFullAccess && data.writeCalendarIdentifier == nil {
+                    if let calId = try? eventKit.ensureWriteCalendar() {
+                        data.writeCalendarIdentifier = calId
+                        data.updatedDate = Date()
+                    }
+                }
             }
         }
     }

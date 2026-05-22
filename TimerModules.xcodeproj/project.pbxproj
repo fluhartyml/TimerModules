@@ -487,6 +487,8 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Calendar Processing Module bridges your calendars in and out — it reads your events to fire ports and writes back to its own dedicated TimerModulesCPM calendar.";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "Calendar Processing Module bridges your calendars in and out — it reads your events to fire ports and writes back to its own dedicated TimerModulesCPM calendar.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
@@ -533,6 +535,8 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Calendar Processing Module bridges your calendars in and out — it reads your events to fire ports and writes back to its own dedicated TimerModulesCPM calendar.";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "Calendar Processing Module bridges your calendars in and out — it reads your events to fire ports and writes back to its own dedicated TimerModulesCPM calendar.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
