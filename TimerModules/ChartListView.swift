@@ -173,8 +173,21 @@ struct ChartListView: View {
 
     // MARK: Bootstrap + actions
 
+    /// iCloud key-value store key for the cross-device "we already
+    /// seeded the user's default chart" flag. Stored in iCloud KVS
+    /// (not UserDefaults) so reinstalls + new devices both honor it
+    /// — without this flag, bootstrap fires before CloudKit sync
+    /// arrives and creates a duplicate "My First Timer Module" every
+    /// time. Per Michael 2026-05-22: "if there is a My First Timer
+    /// Module canvas already there it should not make a new canvas
+    /// no matter the name."
+    private static let didBootstrapFlagKey = "com.nightgard.timermodules.didBootstrapInitialChart"
+
     private func bootstrapIfNeeded() {
-        if charts.isEmpty {
+        let kvs = NSUbiquitousKeyValueStore.default
+        let alreadySeeded = kvs.bool(forKey: Self.didBootstrapFlagKey)
+
+        if charts.isEmpty && !alreadySeeded {
             let firstChart = GanttChartData(
                 name: "My First Timer Module",
                 notation: "",
@@ -182,6 +195,8 @@ struct ChartListView: View {
             )
             modelContext.insert(firstChart)
             adoptOrphans(into: firstChart.id)
+            kvs.set(true, forKey: Self.didBootstrapFlagKey)
+            kvs.synchronize()
         } else if let first = charts.first, hasOrphans {
             adoptOrphans(into: first.id)
         }
