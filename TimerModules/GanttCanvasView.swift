@@ -98,6 +98,46 @@ struct GanttCanvasView: View {
             filter: #Predicate<SupplementalBrickData> { $0.ganttChartId == id },
             sort: [SortDescriptor(\.order), SortDescriptor(\.column)]
         )
+        _starts = Query(
+            filter: #Predicate<StartBrickData> { $0.ganttChartId == id },
+            sort: [SortDescriptor(\.order), SortDescriptor(\.column)]
+        )
+        _delays = Query(
+            filter: #Predicate<DelayBrickData> { $0.ganttChartId == id },
+            sort: [SortDescriptor(\.order), SortDescriptor(\.column)]
+        )
+        _textLCDs = Query(
+            filter: #Predicate<TextLCDBrickData> { $0.ganttChartId == id },
+            sort: [SortDescriptor(\.order), SortDescriptor(\.column)]
+        )
+        _glyphLCDs = Query(
+            filter: #Predicate<GlyphLCDBrickData> { $0.ganttChartId == id },
+            sort: [SortDescriptor(\.order), SortDescriptor(\.column)]
+        )
+        _digitalClocks = Query(
+            filter: #Predicate<DigitalClockBrickData> { $0.ganttChartId == id },
+            sort: [SortDescriptor(\.order), SortDescriptor(\.column)]
+        )
+        _calendarDates = Query(
+            filter: #Predicate<CalendarDateBrickData> { $0.ganttChartId == id },
+            sort: [SortDescriptor(\.order), SortDescriptor(\.column)]
+        )
+        _batteries = Query(
+            filter: #Predicate<BatteryBrickData> { $0.ganttChartId == id },
+            sort: [SortDescriptor(\.order), SortDescriptor(\.column)]
+        )
+        _noteModules = Query(
+            filter: #Predicate<NoteModuleBrickData> { $0.ganttChartId == id },
+            sort: [SortDescriptor(\.order), SortDescriptor(\.column)]
+        )
+        _weatherBricks = Query(
+            filter: #Predicate<WeatherBrickData> { $0.ganttChartId == id },
+            sort: [SortDescriptor(\.order), SortDescriptor(\.column)]
+        )
+        _cpms = Query(
+            filter: #Predicate<CPMBrickData> { $0.ganttChartId == id },
+            sort: [SortDescriptor(\.order), SortDescriptor(\.column)]
+        )
     }
 
     /// Polymorphic wrapper so renderable bricks can share a render
