@@ -6,8 +6,8 @@
 //
 // Vocabulary follows the locked widget shakedown doc
 // (TimerModules-iOS-Widget-Shakedown-DRAFT-2026-05-22.html Section B):
-//   • ARMED  — chart is listening, modules can fire (green dot)
-//   • QUIET  — chart is paused, no firings (grey dot)
+//   • RUN  — chart is listening, modules can fire (green dot)
+//   • READY  — chart is paused, no firings (grey dot)
 //
 // The HALT button + Trigger surface buttons in larger sizes need App
 // Intents wired to the main app's SignalRouter — those land in a
@@ -42,7 +42,7 @@ struct TimerModulesProvider: TimelineProvider {
         let entry = TimerModulesEntry(date: now, snapshot: snapshot)
 
         // Tight refresh window when an active timer is approaching its
-        // end so the widget catches the ARMED → QUIET transition.
+        // end so the widget catches the RUN → READY transition.
         // Otherwise refresh every 15 minutes (under the OS's typical
         // 15-60 min cap for widget timelines).
         let nextRefresh: Date = {
@@ -79,23 +79,23 @@ struct TimerModulesWidgetEntryView: View {
 
     // MARK: Common pieces
 
-    private var armed: Bool { entry.snapshot.isProgramRunning }
+    private var running: Bool { entry.snapshot.isProgramRunning }
 
     private var statusBadge: some View {
         HStack(spacing: 4) {
             Circle()
-                .fill(armed ? Color.green : Color.secondary.opacity(0.5))
+                .fill(running ? Color.green : Color.secondary.opacity(0.5))
                 .frame(width: 8, height: 8)
-            Text(armed ? "ARMED" : "QUIET")
+            Text(running ? "RUN" : "READY")
                 .font(.caption2)
                 .fontWeight(.semibold)
-                .foregroundStyle(armed ? Color.green : .secondary)
+                .foregroundStyle(running ? Color.green : .secondary)
         }
     }
 
     private var activeTimerCountdown: some View {
         Group {
-            if armed,
+            if running,
                let endsAt = entry.snapshot.activeTimerEndsAt,
                let startedAt = entry.snapshot.activeTimerStartedAt,
                endsAt > Date() {
@@ -123,7 +123,7 @@ struct TimerModulesWidgetEntryView: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
-            if armed, let notation = entry.snapshot.activeTimerNotation {
+            if running, let notation = entry.snapshot.activeTimerNotation {
                 Text(notation)
                     .font(.subheadline)
                     .fontWeight(.semibold)
@@ -154,7 +154,7 @@ struct TimerModulesWidgetEntryView: View {
                 }
             }
             Divider()
-            if armed {
+            if running {
                 if let notation = entry.snapshot.activeTimerNotation {
                     Text(notation)
                         .font(.headline)
@@ -188,7 +188,7 @@ struct TimerModulesWidgetEntryView: View {
                 }
             }
             Divider()
-            if armed {
+            if running {
                 if let notation = entry.snapshot.activeTimerNotation {
                     Text(notation)
                         .font(.title3)
@@ -225,7 +225,7 @@ struct TimerModulesWidgetEntryView: View {
     private var lockRectangularView: some View {
         VStack(alignment: .leading, spacing: 2) {
             statusBadge
-            if armed, let notation = entry.snapshot.activeTimerNotation {
+            if running, let notation = entry.snapshot.activeTimerNotation {
                 Text(notation)
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
@@ -247,10 +247,10 @@ struct TimerModulesWidgetEntryView: View {
     // MARK: Lock-screen inline (single line)
 
     private var lockInlineView: some View {
-        if armed, let notation = entry.snapshot.activeTimerNotation {
-            return Text("\(notation) — ARMED")
+        if running, let notation = entry.snapshot.activeTimerNotation {
+            return Text("\(notation) — RUN")
         } else {
-            return Text("TimerModules QUIET")
+            return Text("TimerModules READY")
         }
     }
 
@@ -259,10 +259,10 @@ struct TimerModulesWidgetEntryView: View {
     private var lockCircularView: some View {
         ZStack {
             Circle()
-                .stroke(armed ? Color.green : Color.secondary.opacity(0.5), lineWidth: 2)
-            Image(systemName: armed ? "play.fill" : "pause")
+                .stroke(running ? Color.green : Color.secondary.opacity(0.5), lineWidth: 2)
+            Image(systemName: running ? "play.fill" : "pause")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(armed ? Color.green : .secondary)
+                .foregroundStyle(running ? Color.green : .secondary)
         }
     }
 }
@@ -278,7 +278,7 @@ struct TimerModulesWidget: Widget {
                 .containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("TimerModules")
-        .description("Shows the currently running chart, active Timer, and ARMED / QUIET status.")
+        .description("Shows the currently running chart, active Timer, and RUN / READY status.")
         .supportedFamilies([
             .systemSmall,
             .systemMedium,
