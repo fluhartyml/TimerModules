@@ -5,7 +5,7 @@ import SwiftUI
 import AlarmKit
 #endif
 
-/// Wrapper around AlarmManager.shared for OPerationsHOS Timer integration.
+/// Wrapper around AlarmManager.shared for TimerModules Timer integration.
 /// AlarmKit availability requires iOS 26+; older runtimes get a stub.
 @MainActor
 @Observable
@@ -43,9 +43,12 @@ final class AlarmKitManager {
         return false
     }
 
-    /// Schedules a system-level countdown timer for the given OPerationsHOS Timer record.
-    /// Returns the alarm ID so the caller can persist it for cancellation later.
-    func scheduleTimer(for item: OperatorItem, duration: TimeInterval) async -> UUID? {
+    /// Schedules a system-level countdown alarm for a Timer module.
+    /// `timerID` is carried in the alarm metadata so the caller can match
+    /// the fired alarm back to its Timer for cancellation. Returns the
+    /// alarm ID so the caller can persist it.
+    @discardableResult
+    func scheduleTimer(title: String, duration: TimeInterval, timerID: UUID) async -> UUID? {
         #if canImport(AlarmKit)
         if #available(iOS 26.0, iPadOS 26.0, macCatalyst 26.0, *) {
             if !authorized { _ = await requestAuthorization() }
@@ -53,17 +56,17 @@ final class AlarmKitManager {
 
             let alarmID = UUID()
             do {
-                let attributes = AlarmAttributes<OPerationsHOSAlarmMetadata>(
+                let attributes = AlarmAttributes<TimerModulesAlarmMetadata>(
                     presentation: AlarmPresentation(
                         alert: AlarmPresentation.Alert(
-                            title: LocalizedStringResource(stringLiteral: item.title),
+                            title: LocalizedStringResource(stringLiteral: title),
                             stopButton: .stopButton
                         )
                     ),
-                    metadata: OPerationsHOSAlarmMetadata(itemID: item.id.uuidString),
+                    metadata: TimerModulesAlarmMetadata(timerID: timerID.uuidString),
                     tintColor: .blue
                 )
-                let configuration = AlarmManager.AlarmConfiguration<OPerationsHOSAlarmMetadata>.timer(
+                let configuration = AlarmManager.AlarmConfiguration<TimerModulesAlarmMetadata>.timer(
                     duration: duration,
                     attributes: attributes
                 )
@@ -90,8 +93,8 @@ final class AlarmKitManager {
 #if canImport(AlarmKit)
 import ActivityKit
 
-struct OPerationsHOSAlarmMetadata: AlarmMetadata {
-    let itemID: String
+struct TimerModulesAlarmMetadata: AlarmMetadata {
+    let timerID: String
 }
 #endif
 
