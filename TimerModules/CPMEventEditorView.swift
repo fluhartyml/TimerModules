@@ -48,7 +48,9 @@ struct CPMEventEditorView: View {
 
                 Section("Output ports (1-52)") {
                     TextField("e.g. 7, 12, 23", text: $portsText)
+                        #if os(iOS)
                         .keyboardType(.numbersAndPunctuation)
+                        #endif
                         .autocorrectionDisabled(true)
                     Text("Comma-separated port numbers. Each event can fire one or many ports.")
                         .font(.caption)
@@ -83,7 +85,9 @@ struct CPMEventEditorView: View {
                 }
             }
             .navigationTitle(event.eventName.isEmpty ? "New event" : event.eventName)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

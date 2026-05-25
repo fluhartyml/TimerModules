@@ -53,10 +53,14 @@ struct CPMDetailView: View {
                 nextFiringsFace.tag(4)
                 yearHeatmapFace.tag(5)
             }
+            #if os(iOS)
             .tabViewStyle(.page(indexDisplayMode: .always))
             .indexViewStyle(.page(backgroundDisplayMode: .always))
+            #endif
             .navigationTitle("Calendar Processing Module")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
